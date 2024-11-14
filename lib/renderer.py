@@ -104,10 +104,13 @@ class PlotFileRenderer:
         fontsize = 1024
 
         while x_size_b > x_size or y_size_b > y_size:
-            fontsize -= 4
+            if x_size_b / x_size > 4.0 and y_size_b / y_size > 4.0:
+                fontsize = int(fontsize / 2)
+            else:
+                fontsize -= 4
+
             font = ImageFont.FreeTypeFont("font.ttf", fontsize)
-            if fontsize <= 12:
-                print("Reached 12")
+            if fontsize <= 5:
                 break
 
             t_bbox = draw.multiline_textbbox((pos_x, pos_y), text, font, "mm", 4, "center")
@@ -117,8 +120,10 @@ class PlotFileRenderer:
 
         draw.multiline_text((pos_x, pos_y), text, (0,0,0), font, "mm", 4, "center")
 
-    def _paste_image(self, image_object: Image, image_path: str, x_offset: int, y_offset: int):
+    def _paste_image(self, image_object: Image, image_path: str, x_offset: int, y_offset: int, resize_ratio: float = None):
         rendered_image = Image.open(image_path)
+        if resize_ratio:
+            rendered_image = rendered_image.resize((int(rendered_image.width * resize_ratio), int(rendered_image.height * resize_ratio)))
         image_object.paste(rendered_image, (x_offset, y_offset))
 
     def make_x_plot(self, plot_object: PlotFile):
@@ -131,11 +136,16 @@ class PlotFileRenderer:
 
         single_image_width = plot_object.get_image_width()
         single_image_height = plot_object.get_image_height()
-        
+
         y_text_offset = 200
 
+        if plot_object.get_resize_ratio() is not None:
+            single_image_width = int(single_image_width * plot_object.get_resize_ratio())
+            single_image_height = int(single_image_height * plot_object.get_resize_ratio())
+            y_text_offset = int(200 * plot_object.get_resize_ratio())
+
         total_width = single_image_width * axisobject.get_object_count()
-        total_height = single_image_height + 200
+        total_height = single_image_height + y_text_offset
 
         of_name = plot_object.get_output_folder_name()
 
@@ -147,7 +157,7 @@ class PlotFileRenderer:
             renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image((x_axis[1],)))
 
             # Paste image with specific offsets
-            self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width, y_text_offset)
+            self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width, y_text_offset, plot_object.get_resize_ratio())
 
             # Generate label for image.
             pos_bbox = (x_axis[0]*single_image_width, 0, x_axis[0]*single_image_width + single_image_width, y_text_offset)
@@ -176,6 +186,12 @@ class PlotFileRenderer:
         x_text_offset = 400
         y_text_offset = 200
 
+        if plot_object.get_resize_ratio() is not None:
+            single_image_width = int(single_image_width * plot_object.get_resize_ratio())
+            single_image_height = int(single_image_height * plot_object.get_resize_ratio())
+            x_text_offset = int(400 * plot_object.get_resize_ratio())
+            y_text_offset = int(200 * plot_object.get_resize_ratio())
+
         total_width = single_image_width * amount_of_x_objects_to_generate + x_text_offset
         total_height = single_image_height * amount_of_y_objects_to_generate + y_text_offset
 
@@ -190,7 +206,7 @@ class PlotFileRenderer:
                 renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image(all_arguments))
 
                 # Paste image with specific offsets
-                self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width+x_text_offset, y_axis[0]*single_image_height+y_text_offset)
+                self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width+x_text_offset, y_axis[0]*single_image_height+y_text_offset, plot_object.get_resize_ratio())
 
         for x_axis in enumerate(x_axisobject.get_objects()):
             # Generate labels for images.
@@ -229,6 +245,9 @@ class PlotFileRenderer:
             # x_text_offset = 800 * (2 ** ( (plot_size - 3) // 2 ) )
             y_text_offset = 400 * (2 ** ( (plot_size - 3) // 2 ) )
 
+            if plot_object.get_resize_ratio() is not None:
+                y_text_offset = int(400 * (2 ** ( (plot_size - 3) // 2 ) ) * plot_object.get_resize_ratio())
+
             past_plot_images = []
             for x_axis in enumerate(x_axisobject.get_objects()):
                 past_plot_images.append(self.make_infinite_plot(plot_object, [x_axis[1]] + extra_objects, plot_size - 1))
@@ -239,7 +258,8 @@ class PlotFileRenderer:
             total_width = single_pastplot_width * amount_of_x_objects_to_generate
             total_height = single_pastplot_height + y_text_offset
 
-            imageObject = Image.new("RGB", (total_width, total_height), (255, 128, 0))
+            colorOffset = min(128, 16 * (2 ** ( (plot_size - 3) // 2 ) ))
+            imageObject = Image.new("RGB", (total_width, total_height), (255, 128+colorOffset, 0+colorOffset*2))
 
             for x_axis in enumerate(x_axisobject.get_objects()):
                 # Paste image with specific offsets
@@ -268,6 +288,10 @@ class PlotFileRenderer:
             x_text_offset = 800 * (2 ** ( (plot_size - 3) // 2 ) )
             y_text_offset = 400 * (2 ** ( (plot_size - 3) // 2 ) )
 
+            if plot_object.get_resize_ratio() is not None:
+                x_text_offset = int(800 * (2 ** ( (plot_size - 3) // 2 ) ) * plot_object.get_resize_ratio())
+                y_text_offset = int(400 * (2 ** ( (plot_size - 3) // 2 ) ) * plot_object.get_resize_ratio())
+
             past_plot_images = dict()
             for x_axis in enumerate(x_axisobject.get_objects()):
                 for y_axis in enumerate(y_axisobject.get_objects()):
@@ -279,7 +303,8 @@ class PlotFileRenderer:
             total_width = single_pastplot_width * amount_of_x_objects_to_generate + x_text_offset
             total_height = single_pastplot_height * amount_of_y_objects_to_generate + y_text_offset
 
-            imageObject = Image.new("RGB", (total_width, total_height), (255, 128, 0))
+            colorOffset = min(128, 16 * (2 ** ( (plot_size - 3) // 2 ) ))
+            imageObject = Image.new("RGB", (total_width, total_height), (255, 128+colorOffset, 0+colorOffset*2))
 
             for x_axis in enumerate(x_axisobject.get_objects()):
                 for y_axis in enumerate(y_axisobject.get_objects()):
@@ -305,13 +330,16 @@ class PlotFileRenderer:
         self._prepare_folders(plot_object)
         self._render_all_images(plot_object, *plot_object.axises)
         if output_built_image:
-            image = self.make_infinite_plot(plot_object)
             if "resize_ratio" in kwargs:
-                image = image.resize((int(image.width*kwargs.get("resize_ratio")), int(image.height*kwargs.get("resize_ratio"))))
+                plot_object.set_resize_ratio(kwargs.get("resize_ratio", 1.0))
+
+            image = self.make_infinite_plot(plot_object)    
+
             if "autoreduce" in kwargs:
                 if image.width > kwargs.get("autoreduce") or image.height > kwargs.get("autoreduce"):
                     maxsize = max(image.width, image.height)
                     print("Autoreduce kicked in since one of the dimensions of image is {} out of {}...".format(maxsize, kwargs.get("autoreduce")))
                     newratio = kwargs.get("autoreduce") / maxsize
                     image = image.resize((int(image.width*newratio), int(image.height*newratio)))
+
             image.save("output/{}.png".format(plot_object.get_output_folder_name()))

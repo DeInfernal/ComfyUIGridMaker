@@ -29,6 +29,7 @@ class PlotFile:
     axises = None
     variables = None
     output_folder_name = None
+    resize_ratio = None
     
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:
@@ -85,6 +86,12 @@ class PlotFile:
 
     def get_axis_objects_count(self, axis_id):
         return self.axises[axis_id].get_object_count()
+
+    def get_resize_ratio(self):
+        return self.resize_ratio
+
+    def set_resize_ratio(self, new_ratio):
+        self.resize_ratio = new_ratio
 
     def generate_workflow(self, values: dict):
         string_workflow = self.workflow_stencil
