@@ -30,6 +30,7 @@ class PlotFile:
     variables = None
     output_folder_name = None
     resize_ratio = None
+    ignore_non_replacements = False
     
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:
@@ -93,6 +94,12 @@ class PlotFile:
     def set_resize_ratio(self, new_ratio):
         self.resize_ratio = new_ratio
 
+    def get_ignore_non_replacements(self):
+        return self.ignore_non_replacements
+
+    def set_ignore_non_replacements(self, new_ignore_non_replacements):
+        self.ignore_non_replacements = new_ignore_non_replacements
+
     def generate_workflow(self, values: dict):
         string_workflow = self.workflow_stencil
         # Replace static variables.
@@ -101,7 +108,23 @@ class PlotFile:
 
         # Replace dynamic variables.
         for value in values:
-            string_workflow = string_workflow.replace(value, str(values.get(value)))
+            new_string_workflow = string_workflow.replace(value, str(values.get(value)))
+
+            if not self.ignore_non_replacements and new_string_workflow == string_workflow:
+                print("ERROR! HALT! ERROR! HALT! ERROR! HALT!")
+                print("HALT! ERROR! HALT! ERROR! HALT! ERROR!")
+                print("ERROR! HALT! ERROR! HALT! ERROR! HALT!")
+                print()
+                print("After replacing {} dynamic/Axis variable, no changes were made to the workflow!".format(value))
+                print("This indicates that something is wrong with the Plotfile.")
+                print("Please recheck the plotfile manually.")
+                print("If this is desired behavior, run the script")
+                print("with flag --ignore_non_replacements .")
+                print()
+                input("Press enter to exit program.")
+                exit(0)
+
+            string_workflow = new_string_workflow
 
         # Render workflow.
         rendered_workflow = json.loads(string_workflow)

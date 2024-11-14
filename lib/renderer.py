@@ -326,12 +326,14 @@ class PlotFileRenderer:
             print("Generation of {}-axis structure: Ended at {}...".format(plot_size, time.ctime()))
             return imageObject
 
-    def render(self, plot_object, output_built_image:bool = True, **kwargs):
+    def render(self, plot_object, **kwargs):
         self._prepare_folders(plot_object)
         self._render_all_images(plot_object, *plot_object.axises)
-        if output_built_image:
+        if not kwargs.get("skip_mass_generation"):
             if "resize_ratio" in kwargs:
                 plot_object.set_resize_ratio(kwargs.get("resize_ratio", 1.0))
+
+            plot_object.set_ignore_non_replacements(kwargs.get("ignore_non_replacements"))
 
             image = self.make_infinite_plot(plot_object)    
 
