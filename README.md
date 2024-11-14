@@ -17,8 +17,8 @@ Introducing the ComfyUI Grid Maker - now with INFINITELY-SIZED supported grids (
     4. Enter next command: `pip install -r requirements.txt`
 5. Create a runner file.
     1. Open a Notepad in Grid Maker folder.
-    2. Write next string here: `@call .venv/Scripts/activate.bat`
-    3. Write another string on a new line: `python xy_plot.py --autoreduce 10000 %*`.
+    2. To use my script, you need for a runner to be inside a virtual environment. Write first string: `@call venv/Scripts/activate.bat`. (a path to your venv folder, followed by Scripts/activate.bat)
+    3. Then use a virtual's environment Python to run the script. Write second string on a new line: `python xy_plot.py --autoreduce 10000 %*`. (to use my script, you need to specify flags and a path to plotfile in the end - for earlier you can look down, for latter, that is what %* is doing)
     4. Save file as `run.bat`
 6. Install your favorite font.
     1. Open your Windows Fonts folder (C:\Windows\Fonts)
@@ -175,6 +175,14 @@ The example makes a XY (2 dimension) plot, because there is 2 axises. X (the wid
 Just drag your PlotFile onto `run.bat` you created while installing the Grid Maker.
 
 Your result will wait for you in `OUTPUT` folder.
+
+
+## Command-line flags
+* `--comfyui_ip` - specifies a either web-address or ip-address of your comfyui. By default it is 127.0.0.1, meaning, the script thinks ComfyUI runs on your local computer.
+* `--comfyui_port` - specifies a port of your comfyui. By default it is 8188, meaning, the script thinks ComfyUI never changed it's local port.
+* `--resize_ratio` - if specified, also specify a floating-point number afterwards (example: `--resize_ratio 0.25`). This flag will forcibly resize the final XY-plot down to a specified ratio, making the file smaller, and therefore, more prone to be opened when the amount of Axises is big or when RAM is not high enough.
+* `--autoreduce` - it works like resize_ratio, but instead, takes an integer number (example: `--autoreduce 10000`). This flag will check at the size of final XY-plot, and if it is larger than your specified number (for example, 12000 by 8000 pixels), the whole image will be resized to be at most 10000 pixels big (therefore automatically reducing XY plot size to 10000 by 6666).
+* `--skip_mass_generation` - a very specific flag - if set, the program will skip the final XY-plot generation (so it will only make images that composes the plot, but not the plot itself).
 
 
 ## Personal recommendations
