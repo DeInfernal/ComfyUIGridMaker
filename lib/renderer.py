@@ -264,7 +264,7 @@ class PlotFileRenderer:
             for x_axis in enumerate(x_axisobject.get_objects()):
                 # Paste image with specific offsets
                 x_offset = x_axis[0] * single_pastplot_width
-                y_offset = x_text_offset
+                y_offset = y_text_offset
                 imageObject.paste(past_plot_images[x_axis[0]], (x_offset, y_offset))
 
             for x_axis in enumerate(x_axisobject.get_objects()):
