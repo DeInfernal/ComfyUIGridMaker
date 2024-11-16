@@ -4,6 +4,14 @@ So, you want to make yourself a fancy XY grid with images like in Automatic1111,
 Introducing the ComfyUI Grid Maker - now with INFINITELY-SIZED supported grids (yes, MORE THAN Automatic's MEASELY THREE dimensions!)
 
 ## How to install?
+### For Windows users
+You don't need all this nonsense for Linux geeks. Just download latest release, unzip it and you are gucci!
+
+I already put all the nessesary files like free font.ttf, and even a run.bat file inside. Even with an example workflow and plotfile, just for you! :)
+
+So... Go for 'how to use' section.
+
+### For Linux users
 1. You need a Python 3. It doesn't really matter winch version, but I recommend using 3.10 or something like that.
 2. Download the Grid Maker's Code. (press the green Code button, then Download Zip, then unpack in any suitable place)
 3. Create a python virtual environment.
@@ -28,6 +36,12 @@ Introducing the ComfyUI Grid Maker - now with INFINITELY-SIZED supported grids (
 
 You have successfully installed Grid Maker
 
+### For MacOS users
+Well, you can try using Linux users route, but I'm sure that you don't even need ComfyUI in the first place. Try Midjourney.
+
+### For Android/iOS users
+If you somehow manage to install Python on those devices and complete all the steps for Linux users... congratulations, you are already smarter than me, couldn't help you in any meaningful way >:D
+
 ## How to use?
 ### Step 1: Create a Stencil.
 1. Enter your ComfyUI and make a brand new workflow that you want to automate. **It must have EXACTLY one image output, EXACTLY one 'save image' node.**
@@ -36,7 +50,7 @@ You have successfully installed Grid Maker
 4. Open the saved Stencil, and replace any values with Variables. What is a Variable? Variable is a piece of unique text, that can be automatically replaced. Look below for the example.
 5. After all values has been replaced by Variables, save the JSON file. Your stencil is ready.
 
-Here is an example of what you will find in a unmodified version of JSON, before you turn it into Stencil.
+Here is an example of what you will find in a unmodified version of JSON, before you turn it into Stencil. (NOTICE: if you do have an API version, you wouldn't have things like "size", or "pos", or "color". If you do, then you saved the workflow in normal mode, not an API-mode. Go back to step 2 and save it as API.)
 ```json
   "20": {
     "inputs": {
@@ -183,6 +197,7 @@ Your result will wait for you in `OUTPUT` folder.
 * `--resize_ratio` - if specified, also specify a floating-point number afterwards (example: `--resize_ratio 0.25`). This flag will forcibly resize the final XY-plot down to a specified ratio, making the file smaller, and therefore, more prone to be opened when the amount of Axises is big or when RAM is not high enough.
 * `--autoreduce` - it works like resize_ratio, but instead, takes an integer number (example: `--autoreduce 10000`). This flag will check at the size of final XY-plot, and if it is larger than your specified number (for example, 12000 by 8000 pixels), the whole image will be resized to be at most 10000 pixels big (therefore automatically reducing XY plot size to 10000 by 6666).
 * `--skip_mass_generation` - a very specific flag - if set, the program will skip the final XY-plot generation (so it will only make images that composes the plot, but not the plot itself).
+* `--ignore_non_replacements` - another specific flag. If NOT set, then at the stage of replacing dynamic variables with values (found in Axises), if after replacing the variable, nothing has changed in the workflow, the program will halt with error, possibly notifying you that what you about to generate will look the same as your previous generations (since there was nothing to change in the first place anywhere). If you are somehow OKAY with that, and asknowledge that there is a points in script where nothing will change - you must set this flag, so program will not halt at those stages.
 
 
 ## Personal recommendations
@@ -200,29 +215,29 @@ Your result will wait for you in `OUTPUT` folder.
         VAR_STYLE: "masterpiece, best quality"
         VAR_NEGATIVE: "worst quality, bad quality"
     Axises:
-    - replace: "VAR_STEPS"
-        with:
-        - "8"
-        - "12"
-        - "24"
-    - replace: "VAR_SEED"
-        with:
-        - "6"
-        - "7"
-        - "42"
-        - "420"
-        - "666"
-        - "777"
-        - "4242"
-        - "424242"
-        - "666666"
-        - "696969"
-        - "7777777"
-    - replace: "VAR_VIEW"
-        with:
-        - "front view"
-        - "side view"
-        - "rear view"
+        - replace: "VAR_STEPS"
+          with:
+              - "8"
+              - "12"
+              - "24"
+        - replace: "VAR_SEED"
+          with:
+              - "6"
+              - "7"
+              - "42"
+              - "420"
+              - "666"
+              - "777"
+              - "4242"
+              - "424242"
+              - "666666"
+              - "696969"
+              - "7777777"
+        - replace: "VAR_VIEW"
+          with:
+              - "front view"
+              - "side view"
+              - "rear view"
     WorkflowPath: "workflow_chromaxl_api_friendly_basic.json"
     OutputFolderName: "Illust0001"
     ```
@@ -241,17 +256,17 @@ Your result will wait for you in `OUTPUT` folder.
         VAR_STYLE: "score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up"
         VAR_NEGATIVE: "worst quality, bad quality"
     Axises:
-    - replace: "VAR_STEPS"
-        with:
-        - "8"
-        - "12"
-        - "24"
-    - replace: ["VAR_SEED", "VAR_VIEW"]
-        with:
-        - ["6", "side view"]
-        - ["7", "side view"]
-        - ["42", "rear view"]
-        - ["420", "front view"]
+        - replace: "VAR_STEPS"
+          with:
+              - "8"
+              - "12"
+              - "24"
+        - replace: ["VAR_SEED", "VAR_VIEW"]
+          with:
+              - ["6", "side view"]
+              - ["7", "side view"]
+              - ["42", "rear view"]
+              - ["420", "front view"]
     WorkflowPath: "workflow_chromaxl_api_friendly_basic.json"
     OutputFolderName: "Illust0001"
     ```
