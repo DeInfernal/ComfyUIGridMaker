@@ -29,8 +29,10 @@ class PlotFile:
     axises = None
     variables = None
     output_folder_name = None
+    output_file_suffix = None
     resize_ratio = None
     ignore_non_replacements = False
+    flip_last_axis = False
     
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:
@@ -52,15 +54,28 @@ class PlotFile:
         if "Image_Width" not in self.content:
             raise Exception("A correct Image_Width must be present in PlotFile.")
         self.variables.setdefault("IMAGE_WIDTH", self.content.get("Image_Width"))
+        self.variables.setdefault("IMAGE_DOUBLE_WIDTH", self.content.get("Image_Width")*2)
+        self.variables.setdefault("IMAGE_QUAD_WIDTH", self.content.get("Image_Width")*4)
+        self.variables.setdefault("IMAGE_HALF_WIDTH", int(self.content.get("Image_Width")/2))
+        self.variables.setdefault("IMAGE_QUARTER_WIDTH", int(self.content.get("Image_Width")/4))
 
         if "Image_Height" not in self.content:
             raise Exception("A correct Image_Height must be present in PlotFile.")
         self.variables.setdefault("IMAGE_HEIGHT", self.content.get("Image_Height"))
+        self.variables.setdefault("IMAGE_DOUBLE_HEIGHT", self.content.get("Image_Height")*2)
+        self.variables.setdefault("IMAGE_QUAD_HEIGHT", self.content.get("Image_Height")*4)
+        self.variables.setdefault("IMAGE_HALF_HEIGHT", int(self.content.get("Image_Height")/2))
+        self.variables.setdefault("IMAGE_QUARTER_HEIGHT", int(self.content.get("Image_Height")/4))
 
         if "OutputFolderName" not in self.content:
             print("No OutputFolderName present in PlotFile. Outputing results into folder named 'Generic'")
         self.output_folder_name = self.content.get("OutputFolderName", "Generic")
         self.variables.setdefault("OUTPUT_FOLDER_NAME", self.output_folder_name)
+
+        if "OutputFileSuffix" not in self.content:
+            print("No OutputFileSuffix present in PlotFile. It is set to None.")
+        self.output_file_suffix = self.content.get("OutputFileSuffix", "")
+        self.variables.setdefault("OUTPUT_FILE_SUFFIX", self.output_file_suffix)
 
         if "WorkflowPath" not in self.content:
             raise Exception("A correct WorkflowPath must be present in PlotFile.")
@@ -69,6 +84,9 @@ class PlotFile:
 
     def get_output_folder_name(self):
         return self.output_folder_name
+
+    def get_output_file_suffix(self):
+        return self.output_file_suffix
 
     def get_image_width(self):
         return self.content.get("Image_Width")
@@ -99,6 +117,12 @@ class PlotFile:
 
     def set_ignore_non_replacements(self, new_ignore_non_replacements):
         self.ignore_non_replacements = new_ignore_non_replacements
+
+    def get_flip_last_axis(self):
+        return self.flip_last_axis
+
+    def set_flip_last_axis(self, new_flip_last_axis):
+        self.flip_last_axis = new_flip_last_axis
 
     def generate_workflow(self, values: dict):
         string_workflow = self.workflow_stencil

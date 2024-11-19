@@ -242,10 +242,11 @@ class PlotFileRenderer:
 
             amount_of_x_objects_to_generate = x_axisobject.get_object_count()
 
-            # x_text_offset = 800 * (2 ** ( (plot_size - 3) // 2 ) )
+            x_text_offset = 800 * (2 ** ( (plot_size - 3) // 2 ) )
             y_text_offset = 400 * (2 ** ( (plot_size - 3) // 2 ) )
 
             if plot_object.get_resize_ratio() is not None:
+                x_text_offset = int(800 * (2 ** ( (plot_size - 3) // 2 ) ) * plot_object.get_resize_ratio())
                 y_text_offset = int(400 * (2 ** ( (plot_size - 3) // 2 ) ) * plot_object.get_resize_ratio())
 
             past_plot_images = []
@@ -254,23 +255,40 @@ class PlotFileRenderer:
             
             single_pastplot_width = past_plot_images[0].width
             single_pastplot_height = past_plot_images[0].height
-
-            total_width = single_pastplot_width * amount_of_x_objects_to_generate
-            total_height = single_pastplot_height + y_text_offset
-
             colorOffset = min(128, 16 * (2 ** ( (plot_size - 3) // 2 ) ))
-            imageObject = Image.new("RGB", (total_width, total_height), (255, 128+colorOffset, 0+colorOffset*2))
 
-            for x_axis in enumerate(x_axisobject.get_objects()):
-                # Paste image with specific offsets
-                x_offset = x_axis[0] * single_pastplot_width
-                y_offset = y_text_offset
-                imageObject.paste(past_plot_images[x_axis[0]], (x_offset, y_offset))
+            if plot_object.get_flip_last_axis():
+                total_width = single_pastplot_width + x_text_offset
+                total_height = single_pastplot_height * amount_of_x_objects_to_generate
 
-            for x_axis in enumerate(x_axisobject.get_objects()):
-                # Generate labels for images.
-                pos_bbox = (x_axis[0]*single_pastplot_width, 0, x_axis[0]*single_pastplot_width + single_pastplot_width, y_text_offset)
-                self._make_label(imageObject, pos_bbox, x_axis_variable_name, x_axis[1])
+                imageObject = Image.new("RGB", (total_width, total_height), (255, 128+colorOffset, 0+colorOffset*2))
+
+                for x_axis in enumerate(x_axisobject.get_objects()):
+                    # Paste image with specific offsets
+                    x_offset = x_text_offset
+                    y_offset = x_axis[0] * single_pastplot_height
+                    imageObject.paste(past_plot_images[x_axis[0]], (x_offset, y_offset))
+
+                for x_axis in enumerate(x_axisobject.get_objects()):
+                    # Generate labels for images.
+                    pos_bbox = (0, x_axis[0]*single_pastplot_height, x_text_offset, x_axis[0]*single_pastplot_height+single_pastplot_height)
+                    self._make_label(imageObject, pos_bbox, x_axis_variable_name, x_axis[1])
+            else:
+                total_width = single_pastplot_width * amount_of_x_objects_to_generate
+                total_height = single_pastplot_height + y_text_offset
+
+                imageObject = Image.new("RGB", (total_width, total_height), (255, 128+colorOffset, 0+colorOffset*2))
+
+                for x_axis in enumerate(x_axisobject.get_objects()):
+                    # Paste image with specific offsets
+                    x_offset = x_axis[0] * single_pastplot_width
+                    y_offset = y_text_offset
+                    imageObject.paste(past_plot_images[x_axis[0]], (x_offset, y_offset))
+
+                for x_axis in enumerate(x_axisobject.get_objects()):
+                    # Generate labels for images.
+                    pos_bbox = (x_axis[0]*single_pastplot_width, 0, x_axis[0]*single_pastplot_width + single_pastplot_width, y_text_offset)
+                    self._make_label(imageObject, pos_bbox, x_axis_variable_name, x_axis[1])
 
             print("Generation of {}-axis structure: Ended at {}...".format(plot_size, time.ctime()))
             return imageObject
@@ -334,6 +352,7 @@ class PlotFileRenderer:
                 plot_object.set_resize_ratio(kwargs.get("resize_ratio", 1.0))
 
             plot_object.set_ignore_non_replacements(kwargs.get("ignore_non_replacements"))
+            plot_object.set_flip_last_axis(kwargs.get("flip_last_axis"))
 
             image = self.make_infinite_plot(plot_object)    
 
@@ -344,4 +363,6 @@ class PlotFileRenderer:
                     newratio = kwargs.get("autoreduce") / maxsize
                     image = image.resize((int(image.width*newratio), int(image.height*newratio)))
 
-            image.save("output/{}.png".format(plot_object.get_output_folder_name()))
+            image.save("output/{}{}.png".format(plot_object.get_output_folder_name(), plot_object.get_output_file_suffix()))
+        
+        input("Render completed. Press ENTER to exit the script.")
