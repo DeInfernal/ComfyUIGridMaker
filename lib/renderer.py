@@ -256,6 +256,19 @@ class PlotFileRenderer:
             single_pastplot_width = past_plot_images[0].width
             single_pastplot_height = past_plot_images[0].height
             colorOffset = min(128, 16 * (2 ** ( (plot_size - 3) // 2 ) ))
+            
+            if plot_object.get_autoflip_last_axis():
+                total_width_unflipped = single_pastplot_width * amount_of_x_objects_to_generate
+                total_height_unflipped = single_pastplot_height + y_text_offset
+                total_width_flipped = single_pastplot_width + x_text_offset
+                total_height_flipped = single_pastplot_height * amount_of_x_objects_to_generate
+                
+                ratio_unflipped = max(total_width_unflipped, total_height_unflipped) / min(total_width_unflipped, total_height_unflipped)
+                ratio_flipped = max(total_width_flipped, total_height_flipped) / min(total_width_flipped, total_height_flipped)
+                # Logic: The closer ratio to 1, the closer image to a square. Choose the closest one.
+                plot_object.set_flip_last_axis(ratio_flipped < ratio_unflipped)
+                if plot_object.get_flip_last_axis():
+                    print("Autoflip has kicked in and decided that your last axis is better to be made in vertically.")
 
             if plot_object.get_flip_last_axis():
                 total_width = single_pastplot_width + x_text_offset
@@ -353,6 +366,7 @@ class PlotFileRenderer:
 
             plot_object.set_ignore_non_replacements(kwargs.get("ignore_non_replacements"))
             plot_object.set_flip_last_axis(kwargs.get("flip_last_axis"))
+            plot_object.set_autoflip_last_axis(kwargs.get("autoflip_last_axis"))
 
             image = self.make_infinite_plot(plot_object)    
 

@@ -12,6 +12,7 @@ def parse_args():
     parser.add_argument("--skip_mass_generation", action="store_true", help="Set the flag to skip the step with generation of XY plot (only make images)")
     parser.add_argument("--ignore_non_replacements", action="store_true", help="Set the flag to True if you are fine that on Axis variable replacement step there can be no replacements to workflow")
     parser.add_argument("--flip_last_axis", action="store_true", help="If XY plot is an odd number (3, 5, 7, etc...), then make last axis VERTICAL instead of HORIZONTAL")
+    parser.add_argument("--autoflip_last_axis", action="store_true", help="If XY plot is an odd number (3, 5, 7, etc...), then make last axis VERTICAL instead of HORIZONTAL, if it saves on Autoreduce function!")
     parser.add_argument("--resize_ratio", type=float, help="Set to number lower than 1 to scale down the XY plot (useful if you have thousands of HD images)")
     parser.add_argument("--autoreduce", type=int, help="Set the flag to automatically lower the XY grid size to a (your specified number) pixels if it was above such number.")
     parser.add_argument("plotfile", type=str, help="Path to PLOTFILE")
@@ -26,6 +27,7 @@ if __name__ == "__main__":
     kwargs.setdefault("skip_mass_generation", args.skip_mass_generation)
     kwargs.setdefault("ignore_non_replacements", args.ignore_non_replacements)
     kwargs.setdefault("flip_last_axis", args.flip_last_axis)
+    kwargs.setdefault("autoflip_last_axis", args.autoflip_last_axis)
     if args.resize_ratio is not None:
         kwargs.setdefault("resize_ratio", args.resize_ratio)
     if args.autoreduce is not None:

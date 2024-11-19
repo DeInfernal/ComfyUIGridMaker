@@ -33,6 +33,7 @@ class PlotFile:
     resize_ratio = None
     ignore_non_replacements = False
     flip_last_axis = False
+    autoflip_last_axis = False
     
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:
@@ -123,6 +124,12 @@ class PlotFile:
 
     def set_flip_last_axis(self, new_flip_last_axis):
         self.flip_last_axis = new_flip_last_axis
+
+    def get_autoflip_last_axis(self):
+        return self.autoflip_last_axis
+
+    def set_autoflip_last_axis(self, new_autoflip_last_axis):
+        self.autoflip_last_axis = new_autoflip_last_axis
 
     def generate_workflow(self, values: dict):
         string_workflow = self.workflow_stencil
