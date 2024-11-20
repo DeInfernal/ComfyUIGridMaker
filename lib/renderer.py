@@ -2,6 +2,7 @@ from lib.plotfile import PlotFile, Axis
 from PIL import Image, ImageDraw, ImageFont
 from comfyui_api import ComfyUIAPI
 from lib.filename_sanitizer import sanitize_filename
+from lib.htmlrenderer import html_render
 
 import os
 import time
@@ -357,9 +358,161 @@ class PlotFileRenderer:
             print("Generation of {}-axis structure: Ended at {}...".format(plot_size, time.ctime()))
             return imageObject
 
+    def make_infinite_plot_htmltable(self, plot_object: PlotFile, extra_objects: list = None, plot_size = None):
+        # Extra Objects should contain ONLY objects down from Axis 3.
+        # If plot_size is not specified, then do whatever.
+        if plot_size is None:
+            plot_size = plot_object.get_axis_amount()
+        if extra_objects is None:
+            extra_objects = list()
+
+        # Now let's generate our infinite combo wombo
+        if plot_size == 1:  # Plot = 1, so one-liner. A unique render.
+            # print("Generation of 1-axis (X-only) HTML-structure: Started at {}...".format(time.ctime()))
+
+            x_axisobject = plot_object.get_axis_object(0)  # ID: 0, X-Axis.
+            x_axis_variable_name = x_axisobject.get_variable_name()
+
+            of_name = plot_object.get_output_folder_name()
+
+           # Pregenerate previous tables
+            past_plot_image_names = []
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                # Make object name easier to access
+                renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image((x_axis[1],)))
+                past_plot_image_names.append(renderedImageName)
+
+            # Begin assembling final table
+            table = "<table>"
+            
+            row_names = ""
+            row_tables = ""
+
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                # Paste rows
+                row_names += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])  # Add to name row
+                ppin = past_plot_tables[x_axis[0]]
+                row_tables += '<td><a href="{}"><img src="{}"></a></td>'.format(ppin, ppin)  # Add to table row a previously rendered table
+            table += "<tr>{}</tr><tr>{}</tr>".format(row_names, row_tables)
+            
+            table += "</table>"
+
+            # print("Generation of 1-axis (X-only) HTML-structure: Ended at {}...".format(time.ctime()))
+            return table
+        elif plot_size == 2:  # Plot = 2, so a final XY render.
+            # print("Generation of 2-axis (XY-plot) HTML-structure: Started at {}...".format(time.ctime()))
+
+            x_axisobject = plot_object.get_axis_object(0)  # ID: 0, X-Axis.
+            x_axis_variable_name = x_axisobject.get_variable_name()
+            y_axisobject = plot_object.get_axis_object(1)  # ID: 1, Y-Axis.
+            y_axis_variable_name = y_axisobject.get_variable_name()
+
+            of_name = plot_object.get_output_folder_name()
+
+            past_plot_image_names = dict()
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                for y_axis in enumerate(y_axisobject.get_objects()):
+                    # Make object name easier to access and to generate normal filename
+                    all_arguments = [x_axis[1], y_axis[1]] + list(extra_objects)
+                    renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image(all_arguments))
+                    
+                    past_plot_image_names.setdefault((x_axis[0], y_axis[0]), renderedImageName)
+
+            # Begin assembling final table
+            table = "<table>"
+            
+            # First, assemble the header row
+            table += "<tr>"
+            table += "<td></td>"  # The first element is belonging to Y column, therefore empty.
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                table += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])
+            table += "</tr>"
+
+            # Then assemble image rows
+            for y_axis in enumerate(y_axisobject.get_objects()):
+                table += "<tr><td>{} = {}</td>".format(y_axis_variable_name, y_axis[1])
+                for x_axis in enumerate(x_axisobject.get_objects()):
+                    ppin = past_plot_image_names.get((x_axis[0], y_axis[0]))
+                    table += '<td><a href="{}"><img src="{}"></a></td>'.format(ppin, ppin)
+                table += "</tr>"
+
+            # Finally, close the table.
+            table += "</table>"
+
+            # print("Generation of 2-axis (XY-plot) HTML-structure: Ended at {}...".format(time.ctime()))
+            return table
+        elif plot_size % 2 == 1:  # Plot size is ODD (3, 5, 7). Then it is considered a one-liner of previous iteration.
+            # print("Generation of {}-axis HTML-structure: Started at {}...".format(plot_size, time.ctime()))
+
+            x_axisobject = plot_object.get_axis_object(plot_size-1)  # ID: Last one, so before it comes XY plot, or XYZW plot, etc...
+            x_axis_variable_name = x_axisobject.get_variable_name()
+
+            # Pregenerate previous tables
+            past_plot_tables = []
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                past_plot_tables.append(self.make_infinite_plot_htmltable(plot_object, [x_axis[1]] + extra_objects, plot_size - 1))
+
+            # Begin assembling final table
+            table = "<table>"
+            
+            row_names = ""
+            row_tables = ""
+
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                # Paste rows
+                row_names += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])  # Add to name row
+                row_tables += "<td>{}</td>".format(past_plot_tables[x_axis[0]])  # Add to table row a previously rendered table
+            table += "<tr>{}</tr><tr>{}</tr>".format(row_names, row_tables)
+            
+            table += "</table>"
+
+            # print("Generation of {}-axis HTML-structure: Ended at {}...".format(plot_size, time.ctime()))
+            return table
+        elif plot_size % 2 == 0:  # Plot size is EVEN (4, 6, 8). Then it is considered a XY-plot of previous iteration.
+            # print("Generation of {}-axis HTML-structure: Started at {}...".format(plot_size, time.ctime()))
+
+            x_axisobject = plot_object.get_axis_object(plot_size-2)  # ID: Almost Last one, so before it comes XY plot, or XYZW plot, etc...
+            x_axis_variable_name = x_axisobject.get_variable_name()
+            y_axisobject = plot_object.get_axis_object(plot_size-1)  # ID: Last one, so before it comes XY plot, or XYZW plot, etc...
+            y_axis_variable_name = y_axisobject.get_variable_name()
+
+            past_plot_tables = dict()
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                for y_axis in enumerate(y_axisobject.get_objects()):
+                    past_plot_tables.setdefault((x_axis[0], y_axis[0]), self.make_infinite_plot_htmltable(plot_object, [x_axis[1], y_axis[1]] + extra_objects, plot_size - 2))
+
+            # Begin assembling final table
+            table = "<table>"
+            
+            # First, assemble the header row
+            table += "<tr>"
+            table += "<td></td>"  # The first element is belonging to Y column, therefore empty.
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                table += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])
+            table += "</tr>"
+
+            # Then assemble image rows
+            for y_axis in enumerate(y_axisobject.get_objects()):
+                table += "<tr><td>{} = {}</td>".format(y_axis_variable_name, y_axis[1])
+                for x_axis in enumerate(x_axisobject.get_objects()):
+                    table += "<td>{}</td>".format(past_plot_tables.get((x_axis[0], y_axis[0])))
+                table += "</tr>"
+
+            # Finally, close the table.
+            table += "</table>"
+
+            # print("Generation of {}-axis HTML-structure: Ended at {}...".format(plot_size, time.ctime()))
+            return table
+
     def render(self, plot_object, **kwargs):
         self._prepare_folders(plot_object)
+
+        if kwargs.get("make_html_table"):  # We will make the file beforehand so it can be filled dynamically! >:D
+            with open("output/{}{}.html".format(plot_object.get_output_folder_name(), plot_object.get_output_file_suffix()), "w", encoding="utf-8") as fstream:
+                fstream.write(html_render(plot_object, self.make_infinite_plot_htmltable(plot_object)))
+
         self._render_all_images(plot_object, *plot_object.axises)
+
         if not kwargs.get("skip_mass_generation"):
             if "resize_ratio" in kwargs:
                 plot_object.set_resize_ratio(kwargs.get("resize_ratio", 1.0))

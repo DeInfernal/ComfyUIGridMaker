@@ -10,6 +10,7 @@ def parse_args():
     parser.add_argument("--comfyui_ip", type=str, help="IP of ComfyUI interface", default="127.0.0.1")
     parser.add_argument("--comfyui_port", type=str, help="Port of ComfyUI interface", default="8188")
     parser.add_argument("--skip_mass_generation", action="store_true", help="Set the flag to skip the step with generation of XY plot (only make images)")
+    parser.add_argument("--make_html_table", action="store_true", help="Set the flag to make HTML version of the table too.")
     parser.add_argument("--ignore_non_replacements", action="store_true", help="Set the flag to True if you are fine that on Axis variable replacement step there can be no replacements to workflow")
     parser.add_argument("--flip_last_axis", action="store_true", help="If XY plot is an odd number (3, 5, 7, etc...), then make last axis VERTICAL instead of HORIZONTAL")
     parser.add_argument("--autoflip_last_axis", action="store_true", help="If XY plot is an odd number (3, 5, 7, etc...), then make last axis VERTICAL instead of HORIZONTAL, if it saves on Autoreduce function!")
@@ -28,6 +29,7 @@ if __name__ == "__main__":
     kwargs.setdefault("ignore_non_replacements", args.ignore_non_replacements)
     kwargs.setdefault("flip_last_axis", args.flip_last_axis)
     kwargs.setdefault("autoflip_last_axis", args.autoflip_last_axis)
+    kwargs.setdefault("make_html_table", args.make_html_table)
     if args.resize_ratio is not None:
         kwargs.setdefault("resize_ratio", args.resize_ratio)
     if args.autoreduce is not None:
