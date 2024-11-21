@@ -6,6 +6,7 @@ from lib.htmlrenderer import html_render
 
 import os
 import time
+import hashlib
 
 
 class PlotFileRenderer:
@@ -19,15 +20,50 @@ class PlotFileRenderer:
     def _prepare_folders(self, plot_object):
         os.makedirs("{}/{}".format("output", plot_object.get_output_folder_name()), exist_ok=True)
 
-    def _generate_filename_for_image(self, item: list) -> str:
-        filename = "img"
-        for variable_content in item:
-            if isinstance(variable_content, list) or isinstance(variable_content, tuple):
-                filename += "_"
-                for subvariable_content in variable_content:
-                    filename += "_" + subvariable_content
+    def _flatten_packed_args(self, packed_args: list) -> list:
+        # packed_args = [["VAR_SEED", "6"], [["VAR_SPECIES", "VAR_TEST"], ["CAT", "YEPTEST"]], ...]
+        answer = []
+        for arg in packed_args:
+            if isinstance(arg[0], list) or isinstance(arg[0], tuple):
+                for subarg in enumerate(arg[0]):
+                    answer.append([subarg[1], arg[1][subarg[0]]])
             else:
-                filename += "__" + variable_content
+                answer.append(arg)
+        return answer
+
+    def _packed_args_to_sorted_list(self, packed_args: list) -> list:
+        # packed_args = [["VAR_SEED", "6"], ["VAR_SPECIES", "CAT"], ...]
+        return sorted(self._flatten_packed_args(packed_args))
+
+    def _dictionary_args_to_sorted_list(self, packed_args: dict) -> list:
+        return sorted(list(packed_args.items()))
+
+    def _packed_args_to_string(self, packed_args: list) -> list:
+        # packed_args = [["VAR_SEED", "6"], ["VAR_SPECIES", "CAT"], ...]
+        result = []
+        for i in self._packed_args_to_sorted_list(packed_args):
+            result.append("{} = {}".format(i[0], i[1]))
+        return " | ".join(result)
+
+    def _generate_filename_for_image(self, item, hash: bool = False) -> str:
+        # Item is: [["VAR_SEED", "6"], ["VAR_SPECIES", "CAT"], ...]
+        # or {'VAR_1': "123"} ...
+        # Result doesn't have PNG/JPG extension
+        filename = ""
+
+        if isinstance(item, dict):
+            xitem = self._dictionary_args_to_sorted_list(item)
+        else:
+            xitem = self._packed_args_to_sorted_list(item)
+
+        if not hash:
+            filename += "img_"
+            filename += "_".join(list([i[1] for i in xitem]))
+        else:
+            stringlist = self._packed_args_to_string(xitem)
+            hashedlist = hashlib.sha256(bytes(stringlist, "ansi")).hexdigest()
+            filename += hashedlist
+
         return sanitize_filename(filename)
 
     def _render_all_images(self, plot_object, *axis_objects):
@@ -60,23 +96,24 @@ class PlotFileRenderer:
                         variables.setdefault(subvariable_name[1], item_to_generate[variable_name[0]][subvariable_name[0]])
                 else:  # Else treat it as string
                     variables.setdefault(variable_name[1], item_to_generate[variable_name[0]])
-            all_items_to_generate.append((variables, self._generate_filename_for_image(item_to_generate)))
+            all_items_to_generate.append((variables, self._generate_filename_for_image(variables)))
 
         # Finally, generate all images.
         # ...also track time, just for convinience.
         current_timestamp = time.time()
         current_progress = 0
         maximum_progress = len(all_items_to_generate)
-        
+
         print("Preparing to generate {} images...".format(maximum_progress))
 
         for item_to_generate in all_items_to_generate:
             imagepath = "output/{}/{}.png".format(of_name, item_to_generate[1])
             if os.path.exists(imagepath):
-                print("{} exists, skipping generation.".format(item_to_generate[1]))
+                print("! {}".format(item_to_generate[1]))
             else:
                 rendered_workflow = plot_object.generate_workflow(item_to_generate[0])
                 self.capi.generate_image(rendered_workflow, imagepath)
+                print("+ {}".format(item_to_generate[1]))
 
             # And all of this is to track the progress of time. For convinience, of course.
             current_progress += 1
@@ -127,101 +164,6 @@ class PlotFileRenderer:
             rendered_image = rendered_image.resize((int(rendered_image.width * resize_ratio), int(rendered_image.height * resize_ratio)))
         image_object.paste(rendered_image, (x_offset, y_offset))
 
-    def make_x_plot(self, plot_object: PlotFile):
-        # Width of 1-axis render is a width of image * amount of images
-        # Height of 1-axis render is a height of image + 200 pixels for text
-        print("Generation of 1-axis (X-only) structure: Started at {}...".format(time.ctime()))
-
-        axisobject = plot_object.get_axis_object(0)  # ID: 0, X-Axis.
-        axis_variable_name = axisobject.get_variable_name()
-
-        single_image_width = plot_object.get_image_width()
-        single_image_height = plot_object.get_image_height()
-
-        y_text_offset = 200
-
-        if plot_object.get_resize_ratio() is not None:
-            single_image_width = int(single_image_width * plot_object.get_resize_ratio())
-            single_image_height = int(single_image_height * plot_object.get_resize_ratio())
-            y_text_offset = int(200 * plot_object.get_resize_ratio())
-
-        total_width = single_image_width * axisobject.get_object_count()
-        total_height = single_image_height + y_text_offset
-
-        of_name = plot_object.get_output_folder_name()
-
-        # Make empty image
-        imageObject = Image.new("RGB", (total_width, total_height), (255, 128, 0))
-
-        for x_axis in enumerate(axisobject.get_objects()):
-            # Make object name easier to access
-            renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image((x_axis[1],)))
-
-            # Paste image with specific offsets
-            self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width, y_text_offset, plot_object.get_resize_ratio())
-
-            # Generate label for image.
-            pos_bbox = (x_axis[0]*single_image_width, 0, x_axis[0]*single_image_width + single_image_width, y_text_offset)
-            self._make_label(imageObject, pos_bbox, axis_variable_name, x_axis[1])
-
-        print("Generation of 1-axis (X-only) structure: Ended at {}...".format(time.ctime()))
-        return imageObject
-
-    def make_xy_plot(self, plot_object: PlotFile, *extra_objects):
-        # A bit more complicated, but still fine enough
-        # Width of 2-axis render is a width of image * amount of images on X axis + 400 pixels for text
-        # Height of 2-axis render is a height of image * amount of images on Y axis + 200 pixels for text
-        print("Generation of 2-axis (XY-plot) structure: Started at {}...".format(time.ctime()))
-
-        x_axisobject = plot_object.get_axis_object(0)  # ID: 0, X-Axis.
-        x_axis_variable_name = x_axisobject.get_variable_name()
-        y_axisobject = plot_object.get_axis_object(1)  # ID: 1, Y-Axis.
-        y_axis_variable_name = y_axisobject.get_variable_name()
-
-        single_image_width = plot_object.get_image_width()
-        single_image_height = plot_object.get_image_height()
-
-        amount_of_x_objects_to_generate = x_axisobject.get_object_count()
-        amount_of_y_objects_to_generate = y_axisobject.get_object_count()
-
-        x_text_offset = 400
-        y_text_offset = 200
-
-        if plot_object.get_resize_ratio() is not None:
-            single_image_width = int(single_image_width * plot_object.get_resize_ratio())
-            single_image_height = int(single_image_height * plot_object.get_resize_ratio())
-            x_text_offset = int(400 * plot_object.get_resize_ratio())
-            y_text_offset = int(200 * plot_object.get_resize_ratio())
-
-        total_width = single_image_width * amount_of_x_objects_to_generate + x_text_offset
-        total_height = single_image_height * amount_of_y_objects_to_generate + y_text_offset
-
-        of_name = plot_object.get_output_folder_name()
-
-        imageObject = Image.new("RGB", (total_width, total_height), (255, 128, 0))
-
-        for x_axis in enumerate(x_axisobject.get_objects()):
-            for y_axis in enumerate(y_axisobject.get_objects()):
-                # Make object name easier to access and to generate normal filename
-                all_arguments = [x_axis[1], y_axis[1]] + list(extra_objects)
-                renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image(all_arguments))
-
-                # Paste image with specific offsets
-                self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width+x_text_offset, y_axis[0]*single_image_height+y_text_offset, plot_object.get_resize_ratio())
-
-        for x_axis in enumerate(x_axisobject.get_objects()):
-            # Generate labels for images.
-            pos_bbox = (x_text_offset + x_axis[0]*single_image_width, 0, x_text_offset + x_axis[0]*single_image_width + single_image_width, y_text_offset)
-            self._make_label(imageObject, pos_bbox, x_axis_variable_name, x_axis[1])
-
-        for y_axis in enumerate(y_axisobject.get_objects()):
-            # Generate labels for images.
-            pos_bbox = (0, y_text_offset + y_axis[0] * single_image_height, x_text_offset, y_text_offset + y_axis[0] * single_image_height + single_image_height)
-            self._make_label(imageObject, pos_bbox, y_axis_variable_name, y_axis[1])
-
-        print("Generation of 2-axis (XY-plot) structure: Ended at {}...".format(time.ctime()))
-        return imageObject
-
     def make_infinite_plot(self, plot_object: PlotFile, extra_objects: list = None, plot_size = None):
         # Extra Objects should contain ONLY objects down from Axis 3.
         # If plot_size is not specified, then do whatever.
@@ -231,11 +173,115 @@ class PlotFileRenderer:
             extra_objects = list()
 
         # Now let's generate our infinite combo wombo
-        if plot_size == 1:  # Plot = 1, so one-liner. A unique render.
-            return self.make_x_plot(plot_object)
+        if plot_size == 1:
+            #  ___ _    ___ _____   ___ ___ _______         _     ___ ___ __  __ ___ _  _ ___ ___ ___  _  _
+            # | _ \ |  / _ \_   _| / __|_ _|_  / __|  ___  / |___|   \_ _|  \/  | __| \| / __|_ _/ _ \| \| |
+            # |  _/ |_| (_) || |   \__ \| | / /| _|  |___| | |___| |) | || |\/| | _|| .` \__ \| | (_) | .` |
+            # |_| |____\___/ |_|   |___/___/___|___|       |_|   |___/___|_|  |_|___|_|\_|___/___\___/|_|\_|
+
+            # So, it is plot size = 1, so it is a one-liner. A unique render, must be handled separately altogether.
+            print("Generation of 1-axis (X-only) structure: Started at {}...".format(time.ctime()))
+
+            x_axisobject = plot_object.get_axis_object(0)  # ID: 0, X-Axis.
+            x_axis_variable_name = x_axisobject.get_variable_name()
+
+            single_image_width = plot_object.get_image_width()
+            single_image_height = plot_object.get_image_height()
+
+            y_text_offset = 200
+
+            if plot_object.get_resize_ratio() is not None:
+                single_image_width = int(single_image_width * plot_object.get_resize_ratio())
+                single_image_height = int(single_image_height * plot_object.get_resize_ratio())
+                y_text_offset = int(200 * plot_object.get_resize_ratio())
+
+            total_width = single_image_width * x_axisobject.get_object_count()
+            total_height = single_image_height + y_text_offset
+
+            of_name = plot_object.get_output_folder_name()
+
+            # Make empty image
+            imageObject = Image.new("RGB", (total_width, total_height), (255, 128, 0))
+
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                # Make object name easier to access
+                variables_stack = [[x_axis_variable_name, x_axis[1]]]
+                renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image(variables_stack))
+
+                # Paste image with specific offsets
+                self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width, y_text_offset, plot_object.get_resize_ratio())
+
+                # Generate label for image.
+                pos_bbox = (x_axis[0]*single_image_width, 0, x_axis[0]*single_image_width + single_image_width, y_text_offset)
+                self._make_label(imageObject, pos_bbox, x_axis_variable_name, x_axis[1])
+
+            print("Generation of 1-axis (X-only) structure: Ended at {}...".format(time.ctime()))
+            return imageObject
         elif plot_size == 2:  # Plot = 2, so a final XY render.
-            return self.make_xy_plot(plot_object, *extra_objects)
-        elif plot_size % 2 == 1:  # Plot size is ODD (3, 5, 7). Then it is considered a one-liner of previous iteration.
+            #  ___ _    ___ _____   ___ ___ _______         ___    ___ ___ __  __ ___ _  _ ___ ___ ___  _  _
+            # | _ \ |  / _ \_   _| / __|_ _|_  / __|  ___  |_  )__|   \_ _|  \/  | __| \| / __|_ _/ _ \| \| |
+            # |  _/ |_| (_) || |   \__ \| | / /| _|  |___|  / /___| |) | || |\/| | _|| .` \__ \| | (_) | .` |
+            # |_| |____\___/ |_|   |___/___/___|___|       /___|  |___/___|_|  |_|___|_|\_|___/___\___/|_|\_|
+            
+            # So, a plot size = 2, a main building block of any higher-dimension items.
+            # Must remember: extra_objects is a list of [["VAR_SEED", 12], ["VAR_BLA", "BLA"]]
+            print("Generation of 2-axis (XY-plot) structure: Started at {}...".format(time.ctime()))
+
+            x_axisobject = plot_object.get_axis_object(0)  # ID: 0, X-Axis.
+            x_axis_variable_name = x_axisobject.get_variable_name()
+            y_axisobject = plot_object.get_axis_object(1)  # ID: 1, Y-Axis.
+            y_axis_variable_name = y_axisobject.get_variable_name()
+
+            single_image_width = plot_object.get_image_width()
+            single_image_height = plot_object.get_image_height()
+
+            amount_of_x_objects_to_generate = x_axisobject.get_object_count()
+            amount_of_y_objects_to_generate = y_axisobject.get_object_count()
+
+            x_text_offset = 400
+            y_text_offset = 200
+
+            if plot_object.get_resize_ratio() is not None:
+                single_image_width = int(single_image_width * plot_object.get_resize_ratio())
+                single_image_height = int(single_image_height * plot_object.get_resize_ratio())
+                x_text_offset = int(400 * plot_object.get_resize_ratio())
+                y_text_offset = int(200 * plot_object.get_resize_ratio())
+
+            total_width = single_image_width * amount_of_x_objects_to_generate + x_text_offset
+            total_height = single_image_height * amount_of_y_objects_to_generate + y_text_offset
+
+            of_name = plot_object.get_output_folder_name()
+
+            imageObject = Image.new("RGB", (total_width, total_height), (255, 128, 0))
+
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                for y_axis in enumerate(y_axisobject.get_objects()):
+                    # Make object name easier to access and to generate normal filename
+                    variables_stack = [[x_axis_variable_name, x_axis[1]], [y_axis_variable_name, y_axis[1]]] + list(extra_objects)
+                    renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image(variables_stack))
+
+                    # Paste image with specific offsets
+                    self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width+x_text_offset, y_axis[0]*single_image_height+y_text_offset, plot_object.get_resize_ratio())
+
+            for x_axis in enumerate(x_axisobject.get_objects()):
+                # Generate labels for images.
+                pos_bbox = (x_text_offset + x_axis[0]*single_image_width, 0, x_text_offset + x_axis[0]*single_image_width + single_image_width, y_text_offset)
+                self._make_label(imageObject, pos_bbox, x_axis_variable_name, x_axis[1])
+
+            for y_axis in enumerate(y_axisobject.get_objects()):
+                # Generate labels for images.
+                pos_bbox = (0, y_text_offset + y_axis[0] * single_image_height, x_text_offset, y_text_offset + y_axis[0] * single_image_height + single_image_height)
+                self._make_label(imageObject, pos_bbox, y_axis_variable_name, y_axis[1])
+
+            print("Generation of 2-axis (XY-plot) structure: Ended at {}...".format(time.ctime()))
+            return imageObject
+        elif plot_size % 2 == 1:
+            #  ___ _    ___ _____   ___ ___ _______         ___ _  _ ___ ___ _  _ ___ _____ ___    ___  ___  ___
+            # | _ \ |  / _ \_   _| / __|_ _|_  / __|  ___  |_ _| \| | __|_ _| \| |_ _|_   _| __|  / _ \|   \|   \
+            # |  _/ |_| (_) || |   \__ \| | / /| _|  |___|  | || .` | _| | || .` || |  | | | _|  | (_) | |) | |) |
+            # |_| |____\___/ |_|   |___/___/___|___|       |___|_|\_|_| |___|_|\_|___| |_| |___|  \___/|___/|___/
+
+            # Plot size is ODD (3, 5, 7). Then it is considered a one-liner of previous iteration.
             print("Generation of {}-axis structure: Started at {}...".format(plot_size, time.ctime()))
 
             x_axisobject = plot_object.get_axis_object(plot_size-1)  # ID: Last one, so before it comes XY plot, or XYZW plot, etc...
@@ -252,18 +298,18 @@ class PlotFileRenderer:
 
             past_plot_images = []
             for x_axis in enumerate(x_axisobject.get_objects()):
-                past_plot_images.append(self.make_infinite_plot(plot_object, [x_axis[1]] + extra_objects, plot_size - 1))
-            
+                past_plot_images.append(self.make_infinite_plot(plot_object, [[x_axis_variable_name, x_axis[1]]] + extra_objects, plot_size - 1))
+
             single_pastplot_width = past_plot_images[0].width
             single_pastplot_height = past_plot_images[0].height
             colorOffset = min(128, 16 * (2 ** ( (plot_size - 3) // 2 ) ))
-            
+
             if plot_object.get_autoflip_last_axis():
                 total_width_unflipped = single_pastplot_width * amount_of_x_objects_to_generate
                 total_height_unflipped = single_pastplot_height + y_text_offset
                 total_width_flipped = single_pastplot_width + x_text_offset
                 total_height_flipped = single_pastplot_height * amount_of_x_objects_to_generate
-                
+
                 ratio_unflipped = max(total_width_unflipped, total_height_unflipped) / min(total_width_unflipped, total_height_unflipped)
                 ratio_flipped = max(total_width_flipped, total_height_flipped) / min(total_width_flipped, total_height_flipped)
                 # Logic: The closer ratio to 1, the closer image to a square. Choose the closest one.
@@ -306,7 +352,13 @@ class PlotFileRenderer:
 
             print("Generation of {}-axis structure: Ended at {}...".format(plot_size, time.ctime()))
             return imageObject
-        elif plot_size % 2 == 0:  # Plot size is EVEN (4, 6, 8). Then it is considered a XY-plot of previous iteration.
+        elif plot_size % 2 == 0:
+            #  ___ _    ___ _____   ___ ___ _______         ___ _  _ ___ ___ _  _ ___ _____ ___   _____   _____ _  _
+            # | _ \ |  / _ \_   _| / __|_ _|_  / __|  ___  |_ _| \| | __|_ _| \| |_ _|_   _| __| | __\ \ / / __| \| |
+            # |  _/ |_| (_) || |   \__ \| | / /| _|  |___|  | || .` | _| | || .` || |  | | | _|  | _| \ V /| _|| .` |
+            # |_| |____\___/ |_|   |___/___/___|___|       |___|_|\_|_| |___|_|\_|___| |_| |___| |___| \_/ |___|_|\_|
+
+            # Plot size is EVEN (4, 6, 8). Then it is considered a XY-plot of previous iteration.
             print("Generation of {}-axis structure: Started at {}...".format(plot_size, time.ctime()))
 
             x_axisobject = plot_object.get_axis_object(plot_size-2)  # ID: Almost Last one, so before it comes XY plot, or XYZW plot, etc...
@@ -327,8 +379,8 @@ class PlotFileRenderer:
             past_plot_images = dict()
             for x_axis in enumerate(x_axisobject.get_objects()):
                 for y_axis in enumerate(y_axisobject.get_objects()):
-                    past_plot_images.setdefault((x_axis[0], y_axis[0]), self.make_infinite_plot(plot_object, [x_axis[1], y_axis[1]] + extra_objects, plot_size - 2))
-            
+                    past_plot_images.setdefault((x_axis[0], y_axis[0]), self.make_infinite_plot(plot_object, [[x_axis_variable_name, x_axis[1]], [y_axis_variable_name, y_axis[1]]] + extra_objects, plot_size - 2))
+
             single_pastplot_width = past_plot_images.get((0, 0)).width
             single_pastplot_height = past_plot_images.get((0, 0)).height
 
@@ -379,12 +431,12 @@ class PlotFileRenderer:
             past_plot_image_names = []
             for x_axis in enumerate(x_axisobject.get_objects()):
                 # Make object name easier to access
-                renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image((x_axis[1],)))
+                renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image([x_axis_variable_name, x_axis[1]]))
                 past_plot_image_names.append(renderedImageName)
 
             # Begin assembling final table
-            table = "<table>"
-            
+            table = '<table class="plot_depth_1">'
+
             row_names = ""
             row_tables = ""
 
@@ -392,9 +444,9 @@ class PlotFileRenderer:
                 # Paste rows
                 row_names += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])  # Add to name row
                 ppin = past_plot_tables[x_axis[0]]
-                row_tables += '<td><a href="{}"><img src="{}"></a></td>'.format(ppin, ppin)  # Add to table row a previously rendered table
-            table += "<tr>{}</tr><tr>{}</tr>".format(row_names, row_tables)
-            
+                row_tables += '<td><img class="plot_img" src="{}"></td>'.format(ppin)  # Add to table row a previously rendered table
+            table += '<tr class="plot_depth_1">{}</tr><tr class="plot_depth_1">{}</tr>'.format(row_names, row_tables)
+
             table += "</table>"
 
             # print("Generation of 1-axis (X-only) HTML-structure: Ended at {}...".format(time.ctime()))
@@ -413,16 +465,16 @@ class PlotFileRenderer:
             for x_axis in enumerate(x_axisobject.get_objects()):
                 for y_axis in enumerate(y_axisobject.get_objects()):
                     # Make object name easier to access and to generate normal filename
-                    all_arguments = [x_axis[1], y_axis[1]] + list(extra_objects)
+                    all_arguments = [[x_axis_variable_name, x_axis[1]], [y_axis_variable_name, y_axis[1]]] + list(extra_objects)
                     renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image(all_arguments))
-                    
+
                     past_plot_image_names.setdefault((x_axis[0], y_axis[0]), renderedImageName)
 
             # Begin assembling final table
-            table = "<table>"
-            
+            table = '<table class="plot_depth_2">'
+
             # First, assemble the header row
-            table += "<tr>"
+            table += '<tr class="plot_depth_2">'
             table += "<td></td>"  # The first element is belonging to Y column, therefore empty.
             for x_axis in enumerate(x_axisobject.get_objects()):
                 table += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])
@@ -430,10 +482,12 @@ class PlotFileRenderer:
 
             # Then assemble image rows
             for y_axis in enumerate(y_axisobject.get_objects()):
-                table += "<tr><td>{} = {}</td>".format(y_axis_variable_name, y_axis[1])
+                table += '<tr class="plot_depth_2"><td>{} = {}</td>'.format(y_axis_variable_name, y_axis[1])
                 for x_axis in enumerate(x_axisobject.get_objects()):
                     ppin = past_plot_image_names.get((x_axis[0], y_axis[0]))
-                    table += '<td><a href="{}"><img src="{}"></a></td>'.format(ppin, ppin)
+                    all_arguments = [[x_axis_variable_name, x_axis[1]], [y_axis_variable_name, y_axis[1]]] + list(extra_objects)
+                    rendered_arguments = self._packed_args_to_string(all_arguments)
+                    table += '<td><img class="plot_img" src="{}" data-caption="{}"></td>'.format(ppin, rendered_arguments)
                 table += "</tr>"
 
             # Finally, close the table.
@@ -450,11 +504,11 @@ class PlotFileRenderer:
             # Pregenerate previous tables
             past_plot_tables = []
             for x_axis in enumerate(x_axisobject.get_objects()):
-                past_plot_tables.append(self.make_infinite_plot_htmltable(plot_object, [x_axis[1]] + extra_objects, plot_size - 1))
+                past_plot_tables.append(self.make_infinite_plot_htmltable(plot_object, [[x_axis_variable_name, x_axis[1]]] + extra_objects, plot_size - 1))
 
             # Begin assembling final table
-            table = "<table>"
-            
+            table = '<table class="plot_depth_{}">'.format(plot_size)
+
             row_names = ""
             row_tables = ""
 
@@ -462,8 +516,8 @@ class PlotFileRenderer:
                 # Paste rows
                 row_names += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])  # Add to name row
                 row_tables += "<td>{}</td>".format(past_plot_tables[x_axis[0]])  # Add to table row a previously rendered table
-            table += "<tr>{}</tr><tr>{}</tr>".format(row_names, row_tables)
-            
+            table += '<tr class="plot_depth_{}">{}</tr><tr class="plot_depth_{}">{}</tr>'.format(plot_size, row_names, plot_size, row_tables)
+
             table += "</table>"
 
             # print("Generation of {}-axis HTML-structure: Ended at {}...".format(plot_size, time.ctime()))
@@ -479,13 +533,13 @@ class PlotFileRenderer:
             past_plot_tables = dict()
             for x_axis in enumerate(x_axisobject.get_objects()):
                 for y_axis in enumerate(y_axisobject.get_objects()):
-                    past_plot_tables.setdefault((x_axis[0], y_axis[0]), self.make_infinite_plot_htmltable(plot_object, [x_axis[1], y_axis[1]] + extra_objects, plot_size - 2))
+                    past_plot_tables.setdefault((x_axis[0], y_axis[0]), self.make_infinite_plot_htmltable(plot_object, [[x_axis_variable_name, x_axis[1]], [y_axis_variable_name, y_axis[1]]] + extra_objects, plot_size - 2))
 
             # Begin assembling final table
-            table = "<table>"
-            
+            table = '<table class="plot_depth_{}">'.format(plot_size)
+
             # First, assemble the header row
-            table += "<tr>"
+            table += '<tr class="plot_depth_{}">'.format(plot_size)
             table += "<td></td>"  # The first element is belonging to Y column, therefore empty.
             for x_axis in enumerate(x_axisobject.get_objects()):
                 table += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])
@@ -493,7 +547,7 @@ class PlotFileRenderer:
 
             # Then assemble image rows
             for y_axis in enumerate(y_axisobject.get_objects()):
-                table += "<tr><td>{} = {}</td>".format(y_axis_variable_name, y_axis[1])
+                table += '<tr class="plot_depth_{}"><td>{} = {}</td>'.format(plot_size, y_axis_variable_name, y_axis[1])
                 for x_axis in enumerate(x_axisobject.get_objects()):
                     table += "<td>{}</td>".format(past_plot_tables.get((x_axis[0], y_axis[0])))
                 table += "</tr>"
@@ -521,7 +575,7 @@ class PlotFileRenderer:
             plot_object.set_flip_last_axis(kwargs.get("flip_last_axis"))
             plot_object.set_autoflip_last_axis(kwargs.get("autoflip_last_axis"))
 
-            image = self.make_infinite_plot(plot_object)    
+            image = self.make_infinite_plot(plot_object)
 
             if "autoreduce" in kwargs:
                 if image.width > kwargs.get("autoreduce") or image.height > kwargs.get("autoreduce"):
@@ -531,5 +585,5 @@ class PlotFileRenderer:
                     image = image.resize((int(image.width*newratio), int(image.height*newratio)))
 
             image.save("output/{}{}.png".format(plot_object.get_output_folder_name(), plot_object.get_output_file_suffix()))
-        
+
         input("Render completed. Press ENTER to exit the script.")
