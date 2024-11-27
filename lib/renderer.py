@@ -77,15 +77,29 @@ class PlotFileRenderer:
         # Some variables for convinience
         of_name = plot_object.get_output_folder_name()
 
+        # Order the axises so when tuples are generated, the first axises should change first, or be overwritten by order
+        unordered_axises = list([[axobj.get_order(), axobj] for axobj in axis_objects])
+
+        # Add a number in the position for any unordered stuff
+        for obj in enumerate(unordered_axises):
+            if obj[1][1].get_order() == 0:
+                obj[1][0] += obj[0]
+
+        # Make reversed-ordered list so the bigger numbers go first and the others follow after (meaning bigger numbers change less throughout the generation)
+        almost_ordered_axises = sorted(unordered_axises, reverse=True)
+
+        # And make it look like *axis_objects so I don't need to rewrite much
+        ordered_axis_objects = list([x[1] for x in almost_ordered_axises])
+
         # Make a huge list of objects.
-        pools = [tuple(axis_object.get_objects()) for axis_object in axis_objects]
+        pools = [tuple(axis_object.get_objects()) for axis_object in ordered_axis_objects]
 
         all_variables_possible_to_generate = [[]]
         for pool in pools:
             all_variables_possible_to_generate = [x+[y] for x in all_variables_possible_to_generate for y in pool]
 
         # Turn this huge list into a list of [VARIABLES_DICT, FILENAME].
-        all_variable_names_possible = [axis_object.get_variable_name() for axis_object in axis_objects]
+        all_variable_names_possible = [axis_object.get_variable_name() for axis_object in ordered_axis_objects]
 
         all_items_to_generate = list()
         for item_to_generate in all_variables_possible_to_generate:
@@ -96,7 +110,7 @@ class PlotFileRenderer:
                         variables.setdefault(subvariable_name[1], item_to_generate[variable_name[0]][subvariable_name[0]])
                 else:  # Else treat it as string
                     variables.setdefault(variable_name[1], item_to_generate[variable_name[0]])
-            all_items_to_generate.append((variables, self._generate_filename_for_image(variables)))
+            all_items_to_generate.append((variables, self._generate_filename_for_image(variables, plot_object.get_do_hash_filenames())))
 
         # Finally, generate all images.
         # ...also track time, just for convinience.
@@ -206,7 +220,7 @@ class PlotFileRenderer:
             for x_axis in enumerate(x_axisobject.get_objects()):
                 # Make object name easier to access
                 variables_stack = [[x_axis_variable_name, x_axis[1]]]
-                renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image(variables_stack))
+                renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image(variables_stack, plot_object.get_do_hash_filenames()))
 
                 # Paste image with specific offsets
                 self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width, y_text_offset, plot_object.get_resize_ratio())
@@ -222,7 +236,7 @@ class PlotFileRenderer:
             # | _ \ |  / _ \_   _| / __|_ _|_  / __|  ___  |_  )__|   \_ _|  \/  | __| \| / __|_ _/ _ \| \| |
             # |  _/ |_| (_) || |   \__ \| | / /| _|  |___|  / /___| |) | || |\/| | _|| .` \__ \| | (_) | .` |
             # |_| |____\___/ |_|   |___/___/___|___|       /___|  |___/___|_|  |_|___|_|\_|___/___\___/|_|\_|
-            
+
             # So, a plot size = 2, a main building block of any higher-dimension items.
             # Must remember: extra_objects is a list of [["VAR_SEED", 12], ["VAR_BLA", "BLA"]]
             print("Generation of 2-axis (XY-plot) structure: Started at {}...".format(time.ctime()))
@@ -258,7 +272,7 @@ class PlotFileRenderer:
                 for y_axis in enumerate(y_axisobject.get_objects()):
                     # Make object name easier to access and to generate normal filename
                     variables_stack = [[x_axis_variable_name, x_axis[1]], [y_axis_variable_name, y_axis[1]]] + list(extra_objects)
-                    renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image(variables_stack))
+                    renderedImageName = "output/{}/{}.png".format(of_name, self._generate_filename_for_image(variables_stack, plot_object.get_do_hash_filenames()))
 
                     # Paste image with specific offsets
                     self._paste_image(imageObject, renderedImageName, x_axis[0]*single_image_width+x_text_offset, y_axis[0]*single_image_height+y_text_offset, plot_object.get_resize_ratio())
@@ -431,7 +445,7 @@ class PlotFileRenderer:
             past_plot_image_names = []
             for x_axis in enumerate(x_axisobject.get_objects()):
                 # Make object name easier to access
-                renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image([x_axis_variable_name, x_axis[1]]))
+                renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image([x_axis_variable_name, x_axis[1]], plot_object.get_do_hash_filenames()))
                 past_plot_image_names.append(renderedImageName)
 
             # Begin assembling final table
@@ -466,7 +480,7 @@ class PlotFileRenderer:
                 for y_axis in enumerate(y_axisobject.get_objects()):
                     # Make object name easier to access and to generate normal filename
                     all_arguments = [[x_axis_variable_name, x_axis[1]], [y_axis_variable_name, y_axis[1]]] + list(extra_objects)
-                    renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image(all_arguments))
+                    renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image(all_arguments, plot_object.get_do_hash_filenames()))
 
                     past_plot_image_names.setdefault((x_axis[0], y_axis[0]), renderedImageName)
 
@@ -561,6 +575,8 @@ class PlotFileRenderer:
     def render(self, plot_object, **kwargs):
         self._prepare_folders(plot_object)
 
+        plot_object.set_do_hash_filenames(kwargs.get("hash_filenames"))
+
         if kwargs.get("make_html_table"):  # We will make the file beforehand so it can be filled dynamically! >:D
             with open("output/{}{}.html".format(plot_object.get_output_folder_name(), plot_object.get_output_file_suffix()), "w", encoding="utf-8") as fstream:
                 fstream.write(html_render(plot_object, self.make_infinite_plot_htmltable(plot_object)))
@@ -586,4 +602,5 @@ class PlotFileRenderer:
 
             image.save("output/{}{}.png".format(plot_object.get_output_folder_name(), plot_object.get_output_file_suffix()))
 
-        input("Render completed. Press ENTER to exit the script.")
+        if not kwargs.get("yes"):
+            input("Render completed. Press ENTER to exit the script.")

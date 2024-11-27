@@ -145,7 +145,7 @@ Now, fill it up as you need. I will explain every single setting.
 
 * `Image_Width` and `Image_Height` - you must set them to the **output size of your generated picture**. They are crucial for when generation of a grid takes place.
 * `Variables` - this is your static, unchanging variables. The Grid Maker will replace every single instance of the variables with the value of the variable. Try to make sure they all are in double quotes, just in case. If you need to set a `\` symbol, you need to place four of them (example: `man \\\\(human\\\\)`). Technically you can omit this parameter if you are never to have Variables, but I doubt it.
-* `Axises` - this is your dynamic, changing variables. The Grid Maker will replace every single instance of the variable in parameter `replace` with the every value you set in parameters `with`. Try to make sure they all are in double quotes, just in case.
+* `Axises` - this is your dynamic, changing variables. The Grid Maker will replace every single instance of the variable in parameter `replace` with the every value you set in parameters `with`. Try to make sure they all are in double quotes, just in case. The images will render in order from the first axis (top one) to the last one, so it first will fill the X axis of 1st XY plot, then Y axis of XY plot, then X axis of 2nd XY plot (shifted to X) and so on. You can actually add a parameter called `order`, with a numeric value (example: `order: 999`), and it will shift the order it will generate - useful to shift the order of checkpoints or loras to speed up generative process. By default, 1st axis have order of 0, 2nd axis of 1, 3rd of 2, etc...
 * `WorkflowPath` - a path (relative or absolute) to your Stencil you made in Step 1. Without this setting, script won't know what workflow to use to generate anything.
 * `OutputFolderName` - when working, script will download a lot of files into a somewhat temprorary directory. This parameter controls the name of this directory. Advice: Always change it. It is, well, optional, and if you miss it, it will download everything into a "GENERIC" folder.
 * `OutputFileSuffix` - an extremely optional setting. If set, will save your finished file as `OutputFolderName + OutputFileSuffix.png` instead of `OutputFolderName.png`.
@@ -156,15 +156,26 @@ There is couple of variables that is actually hardcoded:
 IMAGE_WIDTH  - Is replaced with the Image_Width value
 IMAGE_HEIGHT  - same, but for height
 
-IMAGE_DOUBLE_WIDTH
-IMAGE_QUAD_WIDTH
-IMAGE_HALF_WIDTH
-IMAGE_QUARTER_WIDTH
-IMAGE_DOUBLE_HEIGHT
-IMAGE_QUAD_HEIGHT
-IMAGE_HALF_HEIGHT
-IMAGE_QUARTER_HEIGHT
--- A useful variables, containing widths and heights multiplied by 2, 4, 0.5 and 0.25 respectively. Extremely useful if you have exact X2 size somewhere in the workflow. NOTICE: The Image_Height and Image_Width in plotfile still must be an output size of picture, regardless of values of those modified variables.
+IMAGE_[MODIFIER]_[SIDE]
+
+where [MODIFIER]
+* QUARTER
+* HALF
+* ONEANDATHIRDOFHALVED
+* ONEANDAHALFOFHALVED
+* ONEANDTWOTHIRDSOFHALVED
+* ONEANDATHIRD
+* ONEANDAHALF
+* ONEANDTWOTHIRDS
+* DOUBLE
+* QUAD
+
+and [SIDE]
+* WIDTH
+* HEIGHT
+
+will result in an integer value of this side, multiplied by 0.25, 0.5, 0.66, 0.75, 0.83, 1.33, 1.5, 1.66, 2, or 4 respectively
+-- NOTICE: The Image_Height and Image_Width in plotfile still must be an output size of picture, regardless of values of those modified variables.
 
 OUTPUT_FOLDER_NAME  - is replaced with OutputFolderName value
 OUTPUT_FILE_SUFFIX  - is replaced with OutputFileSuffix value
@@ -213,8 +224,10 @@ Your result will wait for you in `OUTPUT` folder.
 * `--autoreduce` - it works like resize_ratio, but instead, takes an integer number (example: `--autoreduce 10000`). This flag will check at the size of final XY-plot, and if it is larger than your specified number (for example, 12000 by 8000 pixels), the whole image will be resized to be at most 10000 pixels big (therefore automatically reducing XY plot size to 10000 by 6666).
 * `--flip_last_axis` - Nice flag. Let's imagine that you generated any odd-numbered Axises. By default, they will stack horizontally, making it difficult to read, especially if your plots are wide, instead of tall. This flag will make sure that your last, final axis is stacked VERTCALLY instead of HORIZONTALLY. Try it out!
 * `--autoflip_last_axis` - same as --flip_last_axis, but will automatically flip last axis for you if it is going to result in more squar-ish image (so, better for autoreduce!). This flag will overpower any presence of your `--flip_last_axis` flag. No need to use them both.
+* `--hash_filenames` - in case something goes wrong with the naming scheme of the generator, you can use hashed filenames. Mostly useful if you use exactly only HTML tables, too.
 * `--skip_mass_generation` - a very specific flag - if set, the program will skip the final XY-plot generation (so it will only make images that composes the plot, but not the plot itself).
 * `--make_html_table` - in addition (or, if --skip_mass_generation is supplied, standalone) to graphical table, make an interactive HTML page where every single picture could be clicked, enlarged, etc.
+* `--yes` - when generation is finished, the script will wait till you press 'enter' to finish it. Supply it with '--yes' flag, and it will not ask for any key, but shut down when it finishes.
 * `--ignore_non_replacements` - another specific flag. If NOT set, then at the stage of replacing dynamic variables with values (found in Axises), if after replacing the variable, nothing has changed in the workflow, the program will halt with error, possibly notifying you that what you about to generate will look the same as your previous generations (since there was nothing to change in the first place anywhere). If you are somehow OKAY with that, and asknowledge that there is a points in script where nothing will change - you must set this flag, so program will not halt at those stages.
 
 

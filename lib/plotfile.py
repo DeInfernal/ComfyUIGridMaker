@@ -5,6 +5,10 @@ import json
 class Axis:
     variablename = None
     objects = None
+    order = None
+    
+    def __lt__(self, other):
+        return self.get_sorting_variable_name() < other.get_sorting_variable_name()
     
     def __init__(self, axis_object):
         if "replace" not in axis_object:
@@ -13,15 +17,22 @@ class Axis:
             raise Exception("In description of axis {} I cannot find 'with' (array of string type, Variable name to replace) object.".format(axis_object))
         self.variablename = axis_object.get("replace")
         self.objects = axis_object.get("with")
+        self.order = axis_object.get("order", 0)
 
     def get_variable_name(self):
         return self.variablename
+
+    def get_sorting_variable_name(self):
+        return self.variablename if isinstance(self.variablename, str) else self.variablename[0]
 
     def get_objects(self):
         return self.objects
 
     def get_object_count(self):
         return len(self.objects)
+
+    def get_order(self):
+        return self.order
 
 class PlotFile:
     content = None
@@ -34,6 +45,7 @@ class PlotFile:
     ignore_non_replacements = False
     flip_last_axis = False
     autoflip_last_axis = False
+    do_hash_filenames = False
     
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:
@@ -55,6 +67,12 @@ class PlotFile:
         if "Image_Width" not in self.content:
             raise Exception("A correct Image_Width must be present in PlotFile.")
         self.variables.setdefault("IMAGE_WIDTH", self.content.get("Image_Width"))
+        self.variables.setdefault("IMAGE_ONEANDATHIRDOFHALVED_WIDTH", int(self.content.get("Image_Width")*0.66))
+        self.variables.setdefault("IMAGE_ONEANDAHALFOFHALVED_WIDTH", int(self.content.get("Image_Width")*0.75))
+        self.variables.setdefault("IMAGE_ONEANDTWOTHIRDSOFHALVED_WIDTH", int(self.content.get("Image_Width")*0.83))
+        self.variables.setdefault("IMAGE_ONEANDATHIRD_WIDTH", int(self.content.get("Image_Width")*1.33))
+        self.variables.setdefault("IMAGE_ONEANDTWOTHIRDS_WIDTH", int(self.content.get("Image_Width")*1.66))
+        self.variables.setdefault("IMAGE_ONEANDAHALF_WIDTH", int(self.content.get("Image_Width")*1.5))
         self.variables.setdefault("IMAGE_DOUBLE_WIDTH", self.content.get("Image_Width")*2)
         self.variables.setdefault("IMAGE_QUAD_WIDTH", self.content.get("Image_Width")*4)
         self.variables.setdefault("IMAGE_HALF_WIDTH", int(self.content.get("Image_Width")/2))
@@ -63,6 +81,12 @@ class PlotFile:
         if "Image_Height" not in self.content:
             raise Exception("A correct Image_Height must be present in PlotFile.")
         self.variables.setdefault("IMAGE_HEIGHT", self.content.get("Image_Height"))
+        self.variables.setdefault("IMAGE_ONEANDATHIRDOFHALVED_HEIGHT", int(self.content.get("Image_Height")*0.66))
+        self.variables.setdefault("IMAGE_ONEANDAHALFOFHALVED_HEIGHT", int(self.content.get("Image_Height")*0.75))
+        self.variables.setdefault("IMAGE_ONEANDTWOTHIRDSOFHALVED_HEIGHT", int(self.content.get("Image_Height")*0.83))
+        self.variables.setdefault("IMAGE_ONEANDATHIRD_HEIGHT", int(self.content.get("Image_Height")*1.33))
+        self.variables.setdefault("IMAGE_ONEANDTWOTHIRDS_HEIGHT", int(self.content.get("Image_Height")*1.66))
+        self.variables.setdefault("IMAGE_ONEANDAHALF_HEIGHT", int(self.content.get("Image_Height")*1.5))
         self.variables.setdefault("IMAGE_DOUBLE_HEIGHT", self.content.get("Image_Height")*2)
         self.variables.setdefault("IMAGE_QUAD_HEIGHT", self.content.get("Image_Height")*4)
         self.variables.setdefault("IMAGE_HALF_HEIGHT", int(self.content.get("Image_Height")/2))
@@ -130,6 +154,12 @@ class PlotFile:
 
     def set_autoflip_last_axis(self, new_autoflip_last_axis):
         self.autoflip_last_axis = new_autoflip_last_axis
+        
+    def get_do_hash_filenames(self):
+        return self.do_hash_filenames
+
+    def set_do_hash_filenames(self, new_do_hash_filenames):
+        self.do_hash_filenames = new_do_hash_filenames
 
     def generate_workflow(self, values: dict):
         string_workflow = self.workflow_stencil

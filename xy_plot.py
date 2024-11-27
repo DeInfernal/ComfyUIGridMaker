@@ -12,6 +12,8 @@ def parse_args():
     parser.add_argument("--skip_mass_generation", action="store_true", help="Set the flag to skip the step with generation of XY plot (only make images)")
     parser.add_argument("--make_html_table", action="store_true", help="Set the flag to make HTML version of the table too.")
     parser.add_argument("--ignore_non_replacements", action="store_true", help="Set the flag to True if you are fine that on Axis variable replacement step there can be no replacements to workflow")
+    parser.add_argument("--yes", action="store_true", help="Do not wait for enter key in the end")
+    parser.add_argument("--hash_filenames", action="store_true", help="Use sha256 hex-hashed filenames instead of usual filenames")
     parser.add_argument("--flip_last_axis", action="store_true", help="If XY plot is an odd number (3, 5, 7, etc...), then make last axis VERTICAL instead of HORIZONTAL")
     parser.add_argument("--autoflip_last_axis", action="store_true", help="If XY plot is an odd number (3, 5, 7, etc...), then make last axis VERTICAL instead of HORIZONTAL, if it saves on Autoreduce function!")
     parser.add_argument("--resize_ratio", type=float, help="Set to number lower than 1 to scale down the XY plot (useful if you have thousands of HD images)")
@@ -30,6 +32,8 @@ if __name__ == "__main__":
     kwargs.setdefault("flip_last_axis", args.flip_last_axis)
     kwargs.setdefault("autoflip_last_axis", args.autoflip_last_axis)
     kwargs.setdefault("make_html_table", args.make_html_table)
+    kwargs.setdefault("hash_filenames", args.hash_filenames)
+    kwargs.setdefault("yes", args.yes)
     if args.resize_ratio is not None:
         kwargs.setdefault("resize_ratio", args.resize_ratio)
     if args.autoreduce is not None:
