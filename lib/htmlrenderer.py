@@ -1,10 +1,55 @@
 # I just need to throw this code elsewhere cuz I think it is going to be pretty big and messy when someone more professional gets to tinker with it.
 def html_render(plot_object, table_string):
+    axislist = plot_object.axises
     title = plot_object.get_output_folder_name()
     iwidth = plot_object.get_image_width() // 4
     iheight = plot_object.get_image_height() // 4
     
-    timeinterval = str(30 * 1000)
+    # 30 secs if items are 1000 or lower
+    # 180 secs if items are higher than 10000
+    count_of_generated_objects = 1
+    for axis in axislist:
+        count_of_generated_objects *= axis.get_object_count()
+    seconds_to_wait_on_reloads = int(30 + min(max(0, count_of_generated_objects-1000), 9000)/9000 * 150)
+    timeinterval = str(seconds_to_wait_on_reloads * 1000)
+    
+    # Turn variables into better readable variants.
+    all_existing_variables_and_their_list_values = dict()
+    for axis in axislist:
+        variablename = axis.get_variable_name()
+        if not isinstance(variablename, str):
+            all_objects = axis.get_objects()
+            for subvariablename in enumerate(variablename):
+                all_existing_variables_and_their_list_values.setdefault(subvariablename[1], list())
+                for objectz in all_objects:
+                    if objectz[subvariablename[0]] not in all_existing_variables_and_their_list_values[subvariablename[1]]:
+                        all_existing_variables_and_their_list_values[subvariablename[1]].append(objectz[subvariablename[0]])
+        else:
+            all_existing_variables_and_their_list_values.setdefault(variablename, axis.get_objects())
+    all_existing_variables_and_their_list_values_kv = sorted(all_existing_variables_and_their_list_values.items())
+
+    # Now assemble the filter item
+    checkbox_filter = "<div>\n"
+    checkbox_filter += "<h3>Image filter:</h3>\n"
+    checkbox_filter += "<i>Notice: Image filtering in beta-test mode, therefore, there is a lot of things that can be somewhat broken (like, if you have complex list variables). Otherwise, enjoy.</i><br>\n"
+    checkbox_filter += "<table>\n"
+    
+    checkbox_filter += "<tr>\n"
+    for variablename in all_existing_variables_and_their_list_values_kv:
+        checkbox_filter += "<td><h4>{}</h4></td>".format(variablename[0])
+    checkbox_filter += "</tr>\n"
+
+    checkbox_filter += "<tr>\n"
+    for variablename in all_existing_variables_and_their_list_values_kv:
+        checkbox_filter += "<td>"
+        for objectz in variablename[1]:
+            checkbox_filter += "<label><input type=\"checkbox\" class=\"filter\" data-filter-type=\"{}\" value=\"{}\" checked>{}</label><br>".format(variablename[0].lower(), objectz, objectz)
+        checkbox_filter += "</td>"
+    checkbox_filter += "</tr>\n"
+
+    checkbox_filter += "</table>\n"
+    checkbox_filter += "</div>"
+    
     
     style = """
 body {{
@@ -32,6 +77,10 @@ td {{
 table {{
     border-collapse: collapse;
     margin: 10px 0;
+}}
+
+.hidden {{
+    display: none;
 }}
 
 .overlay {{
@@ -85,6 +134,27 @@ tr.plot_depth_9, tr.plot_depth_10 {{
 }}
     """.format(width=iwidth, height=iheight)
 
+    filterscript = ""
+    for kv in all_existing_variables_and_their_list_values_kv:
+        filterscript += "const selected{} = Array.from(checkboxes).filter(checkbox => checkbox.checked && checkbox.dataset.filterType === '{}').map(checkbox => checkbox.value);\n".format(kv[0].lower(), kv[0].lower())
+    filterscript += "\n"
+    filterscript += "images.forEach(image => {\n"
+    for kv in all_existing_variables_and_their_list_values_kv:
+        filterscript += "const image{} = image.getAttribute('data-{}');\n".format(kv[0].lower(), kv[0].lower())
+    
+    list_filterscript = list()
+    for kv in all_existing_variables_and_their_list_values_kv:
+        list_filterscript.append("selected{}.includes(image{})".format(kv[0].lower(), kv[0].lower()))
+
+    filterscript += "if ("
+    filterscript += " && ".join(list_filterscript)
+    filterscript += ") {\n"
+    filterscript += "image.classList.remove('hidden')\n"
+    filterscript += "} else {\n"
+    filterscript += "image.classList.add('hidden')\n"
+    filterscript += "}\n"
+    filterscript += "});"
+
     script = """
 <script>
     // Function to handle image click and display overlay
@@ -127,8 +197,19 @@ tr.plot_depth_9, tr.plot_depth_10 {{
             }}, {timeinterval});
         }};
     }});
+    
+    const checkboxes = document.querySelectorAll('.filter');
+    const filteredimages = document.querySelectorAll('.plot-img');
+    function filterImages() {{
+            {filterscript}
+        }}
+        
+    checkboxes.forEach(checkbox => {{
+        checkbox.addEventListener('change', filterImages);
+    }});
+    
 
-</script>""".format(timeinterval=timeinterval)
+</script>""".format(filterscript=filterscript, timeinterval=timeinterval)
 
     page = """<html>
 <head>
@@ -138,6 +219,9 @@ tr.plot_depth_9, tr.plot_depth_10 {{
 </style>
 </head>
 <body>
+<h1>Rendered XY plot of {title} folder</h1>
+<div><i>Notice: If you have plots with more than 4000 images, you WILL need a beefy RAM.</i></div>
+{checkbox_filter}
 {table}
 
 <div class="overlay" id="overlay">
@@ -148,6 +232,6 @@ tr.plot_depth_9, tr.plot_depth_10 {{
 {script}
 
 </body>
-</html>""".format(title=title, style=style, script=script, table=table_string)
+</html>""".format(checkbox_filter=checkbox_filter, title=title, style=style, script=script, table=table_string)
     
     return page

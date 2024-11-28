@@ -43,7 +43,18 @@ class PlotFileRenderer:
         result = []
         for i in self._packed_args_to_sorted_list(packed_args):
             result.append("{} = {}".format(i[0], i[1]))
+        
+        # output: VAR_SEED = 6 | VAR_SPECIES = CAT
         return " | ".join(result)
+
+    def _packed_args_to_htmlargs(self, packed_args: list) -> list:
+        # packed_args = [["VAR_SEED", "6"], ["VAR_SPECIES", "CAT"], ...]
+        result = []
+        for i in self._packed_args_to_sorted_list(packed_args):
+            result.append("data-{} = \"{}\"".format(i[0].lower(), i[1]))
+        
+        # output: data-var_seed="6" data-var_species="CAT"
+        return " ".join(result)
 
     def _generate_filename_for_image(self, item, hash: bool = False) -> str:
         # Item is: [["VAR_SEED", "6"], ["VAR_SPECIES", "CAT"], ...]
@@ -501,7 +512,8 @@ class PlotFileRenderer:
                     ppin = past_plot_image_names.get((x_axis[0], y_axis[0]))
                     all_arguments = [[x_axis_variable_name, x_axis[1]], [y_axis_variable_name, y_axis[1]]] + list(extra_objects)
                     rendered_arguments = self._packed_args_to_string(all_arguments)
-                    table += '<td><img class="plot_img" src="{}" data-caption="{}"></td>'.format(ppin, rendered_arguments)
+                    html_arguments = self._packed_args_to_htmlargs(all_arguments)
+                    table += '<td><img class="plot_img" src="{}" data-caption="{}" {}></td>'.format(ppin, rendered_arguments, html_arguments)
                 table += "</tr>"
 
             # Finally, close the table.
