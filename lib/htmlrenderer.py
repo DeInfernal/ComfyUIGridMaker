@@ -138,7 +138,7 @@ tr.plot_depth_9, tr.plot_depth_10 {{
     for kv in all_existing_variables_and_their_list_values_kv:
         filterscript += "const selected{} = Array.from(checkboxes).filter(checkbox => checkbox.checked && checkbox.dataset.filterType === '{}').map(checkbox => checkbox.value);\n".format(kv[0].lower(), kv[0].lower())
     filterscript += "\n"
-    filterscript += "images.forEach(image => {\n"
+    filterscript += "filteredimages.forEach(image => {\n"
     for kv in all_existing_variables_and_their_list_values_kv:
         filterscript += "const image{} = image.getAttribute('data-{}');\n".format(kv[0].lower(), kv[0].lower())
     
@@ -199,7 +199,7 @@ tr.plot_depth_9, tr.plot_depth_10 {{
     }});
     
     const checkboxes = document.querySelectorAll('.filter');
-    const filteredimages = document.querySelectorAll('.plot-img');
+    const filteredimages = document.querySelectorAll('img.plot_img');
     function filterImages() {{
             {filterscript}
         }}
