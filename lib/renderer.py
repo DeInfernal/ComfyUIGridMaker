@@ -456,7 +456,7 @@ class PlotFileRenderer:
             past_plot_image_names = []
             for x_axis in enumerate(x_axisobject.get_objects()):
                 # Make object name easier to access
-                renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image([x_axis_variable_name, x_axis[1]], plot_object.get_do_hash_filenames()))
+                renderedImageName = "{}/{}.png".format(of_name, self._generate_filename_for_image([[x_axis_variable_name, x_axis[1]]], plot_object.get_do_hash_filenames()))
                 past_plot_image_names.append(renderedImageName)
 
             # Begin assembling final table
@@ -468,7 +468,7 @@ class PlotFileRenderer:
             for x_axis in enumerate(x_axisobject.get_objects()):
                 # Paste rows
                 row_names += "<td>{} = {}</td>".format(x_axis_variable_name, x_axis[1])  # Add to name row
-                ppin = past_plot_tables[x_axis[0]]
+                ppin = past_plot_image_names[x_axis[0]]
                 row_tables += '<td><img class="plot_img" src="{}"></td>'.format(ppin)  # Add to table row a previously rendered table
             table += '<tr class="plot_depth_1">{}</tr><tr class="plot_depth_1">{}</tr>'.format(row_names, row_tables)
 
