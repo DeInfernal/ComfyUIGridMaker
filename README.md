@@ -302,3 +302,52 @@ Your result will wait for you in `OUTPUT` folder.
     OutputFolderName: "Illust0001"
     ```
     (this will replace VAR_SEED and VAR_VIEW at the same time with a specific values, in case you need such specificality)
+
+## LinearFiles, or, Animations
+If you ever wanted to get yourself a nice animation on how things change when you shift the weights, but you never had a reason to try - well, you've came to the right place. I've made a tool for you!
+
+To use it, you need same stencil you used for Plotfile, and mostly, it works for Linearfile. But difference between the two is that Plotfile uses Axises and LinearFile uses Sliders. Here is the example of a LinearFile
+
+```yaml
+  VAR_PROMPT: "VAR_STYLE, VAR_MAINBODY, VAR_BACKGROUND"
+  VAR_MAINBODY: "(thing:VAR_SLIDER1), (otherthing:VAR_SLIDER2), (thirdthing:VAR_SLIDER3)"
+  VAR_BACKGROUND: "detailed background, "
+  VAR_STYLE: "(masterpiece, best quality, high quality, hires:1.20)"
+
+  VAR_NEGATIVE: "(worst quality, old, early:1.5), (low quality, lowres:1.2), fat, obese, morbidly obese, grainy, noisy, render, filmgrain, sketch, manga, line art, monochrome, toony, watermark, mosaic censorship, patreon logo, signature"
+Sliders:
+  - slider: "VAR_SLIDER1"
+    from: 0.0
+    to: 1.5
+    step: 0.01
+  - slider: "VAR_SLIDER2"
+    from: 0.5
+    to: 1.5
+    steps: 120
+  - slider: "VAR_SLIDER3"
+    from: 1.0
+    to: 0.0
+    seconds: 5
+```
+
+How to read this file?
+
+* First, the script will make first image. VAR_MAINBODY will be set to `(thing:0.0), (otherthing:0.5), (thirdthing:1.0)`
+* Then, the script will make 150 images, increasing VAR_SLIDER1 from 0.0 to 1.5, with step of 0.01, so -> `(thing:0.01), (otherthing:0.5), (thirdthing:1.0)`, then `(thing:0.02), (otherthing:0.5), (thirdthing:1.0)`, then `(thing:0.03), (otherthing:0.5), (thirdthing:1.0)`... until `(thing:1.5), (otherthing:0.5), (thirdthing:1.0)`
+* Next, the script will make 120 images, increasing VAR_SLIDER2 from 0.5 to 1.5. Notice, that we didn't determined the step size, but instead, determined amount of steps to reach the desired value. In our case, the step will be automatically calculated as `0.08333`, and so, next images will be made: `(thing:1.5), (otherthing:0.508333), (thirdthing:1.0)` -> `(thing:1.5), (otherthing:0.51666), (thirdthing:1.0)` ... `(thing:1.5), (otherthing:1.5), (thirdthing:1.0)` --- Notice how the first slider stayed at 1.5
+* Last, the script will make enough images to fill a 5 seconds of a 24-fps image. (so, 5 * 24 = 120 frames). Step will be calculated automatically, so it is -0.08333, and therefore, last 120 images generated, finishing at `(thing:1.5), (otherthing:1.5), (thirdthing:0.0)`
+
+And use the `linear_movie.py` instead of `xy_plot.py`.
+
+### Command-line flags
+Arguments has also been tweaked a bit.
+
+* `--comfyui_ip` - still specifies a either web-address or ip-address of your comfyui. By default it is 127.0.0.1, meaning, the script thinks ComfyUI runs on your local computer.
+* `--comfyui_port` - still specifies a port of your comfyui. By default it is 8188, meaning, the script thinks ComfyUI never changed it's local port.
+* `--output_type` - allows you to specify the output of your final animation. By default it is "webp", but can also output "mp4" and "apng"
+* `--fps` - allows you to specify how much frames per second you want to see. By default it is 24.
+* `--skip_compilation` - a very specific flag - if set, the program will skip the final animation generation
+* `--do_reverse` - if set, then animation will first go from first slider to the last, as usual, and then at the end, will reverse, and go from last slider back to first.
+* `--yes` - when generation is finished, the script will wait till you press 'enter' to finish it. Supply it with '--yes' flag, and it will not ask for any key, but shut down when it finishes.
+* `--ignore_non_replacements` - another specific flag. If NOT set, then at the stage of replacing dynamic variables with values (found in Sliders), if after replacing the variable, nothing has changed in the workflow, the program will halt with error, possibly notifying you that what you about to generate will look the same as your previous generations (since there was nothing to change in the first place anywhere). If you are somehow OKAY with that, and asknowledge that there is a points in script where nothing will change - you must set this flag, so program will not halt at those stages.
+* `--resize_ratio` - (CURRENTLY DOESNT WORK) if specified, also specify a floating-point number afterwards (example: `--resize_ratio 0.25`). This flag will forcibly resize the final animation down to a specified ratio, making the file smaller, and therefore, more prone to be opened when the amount of Sliders is big or when RAM is not high enough.

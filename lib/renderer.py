@@ -1,4 +1,5 @@
 from lib.plotfile import PlotFile, Axis
+from lib.linefile import LineFile, Slider
 from PIL import Image, ImageDraw, ImageFont
 from comfyui_api import ComfyUIAPI
 from lib.filename_sanitizer import sanitize_filename
@@ -7,6 +8,9 @@ from lib.htmlrenderer import html_render
 import os
 import time
 import hashlib
+
+import apng
+import cv2
 
 
 class PlotFileRenderer:
@@ -613,6 +617,188 @@ class PlotFileRenderer:
                     image = image.resize((int(image.width*newratio), int(image.height*newratio)))
 
             image.save("output/{}{}.png".format(plot_object.get_output_folder_name(), plot_object.get_output_file_suffix()))
+
+        if not kwargs.get("yes"):
+            input("Render completed. Press ENTER to exit the script.")
+
+
+class LineFileRenderer:
+    capi = None
+
+    def __init__(self, comfyui_api) -> None:
+        if not isinstance(comfyui_api, ComfyUIAPI):
+            raise Exception("Cannot initalize LineFileRenderer - no ComfyUIAPI object provided.")
+        self.capi = comfyui_api
+
+    def _prepare_folders(self, line_object):
+        os.makedirs("{}/{}".format("output", line_object.get_output_folder_name()), exist_ok=True)
+
+    def _clone_workflowstate(self, workflow_state):
+        new_workflow_state = dict()
+        for item in workflow_state:
+            new_workflow_state.setdefault(item, str(workflow_state.get(item)))
+        return new_workflow_state
+
+    def _render_all_images(self, line_object, *sliders_objects):
+        print("Generation/Rendering: Started at {}...".format(time.ctime()))
+
+        # Just a preflight checks...
+        for slider_object in sliders_objects:
+            if not isinstance(slider_object, Slider):
+                raise Exception("_render_all_images received a non-slider object {} - script shutdowned".format(slider_object))
+
+        # Some variables for convinience
+        of_name = line_object.get_output_folder_name()
+
+        # Build initial workflow state
+        workflow_state = line_object.get_initial_workflow_state()
+        
+        # Build queue of images and fill it with first image
+        image_queue = list()
+        image_queue.append(self._clone_workflowstate(workflow_state))
+        
+        # Now go and make each slider slide.
+        for slider in sliders_objects:
+            current_varname = slider.get_variable_name()
+            current_from = workflow_state.get(current_varname)
+            list_of_frames = slider.compile(current_from, line_object.get_fps())
+            for frame in list_of_frames:
+                workflow_state[current_varname] = frame
+                image_queue.append(self._clone_workflowstate(workflow_state))
+
+        # Finally, generate all images.
+        # ...also track time, just for convinience.
+        current_timestamp = time.time()
+        current_progress = 0
+        maximum_progress = len(image_queue)
+
+        print("Preparing to generate {} images...".format(maximum_progress))
+
+        for item_to_generate in enumerate(image_queue):
+            imgnumber = str(item_to_generate[0]).zfill(8)
+            imagepath = "output/{}/{}.png".format(of_name, imgnumber)
+            if os.path.exists(imagepath):
+                print("! {}".format(imgnumber))
+                # print("--- {}".format(item_to_generate))
+            else:
+                rendered_workflow = line_object.generate_workflow(item_to_generate[1])
+                self.capi.generate_image(rendered_workflow, imagepath)
+                print("+ {}".format(imgnumber))
+
+            # And all of this is to track the progress of time. For convinience, of course.
+            current_progress += 1
+            progress_percentage = current_progress/maximum_progress*10000//1/100
+            new_timestamp = time.time()
+            elapsed_time = (new_timestamp - current_timestamp) * 100 // 1 / 100
+            seconds_left_till_finish = (maximum_progress - current_progress) * elapsed_time
+            sensible_time_timestamp = time.ctime(new_timestamp + seconds_left_till_finish)
+            print("Progress: {} of {} ({}%), ETA of completion: {}.".format(current_progress, maximum_progress, progress_percentage, sensible_time_timestamp))
+            current_timestamp = new_timestamp
+
+        print("Generation/Rendering: Finished at {}...".format(time.ctime()))
+
+    def render(self, line_object, **kwargs):
+        self._prepare_folders(line_object)
+        line_object.set_fps(kwargs.get("fps"))
+        line_object.set_ignore_non_replacements(kwargs.get("ignore_non_replacements"))
+
+        self._render_all_images(line_object, *line_object.sliders)
+
+        if not kwargs.get("skip_compilation"):
+            if "resize_ratio" in kwargs:
+                line_object.set_resize_ratio(kwargs.get("resize_ratio", 1.0))
+
+            if kwargs.get("output_type") == "apng":
+                apng_image = apng.APNG()
+                delay_time = int(1000 / line_object.get_fps())
+                ofname = line_object.get_output_folder_name()
+                images_folder = "{}/{}".format("output", ofname)
+                list_of_images = os.listdir(images_folder)
+                apng_image.append_file("{}/{}/{}".format("output", ofname, list_of_images[0]), delay=4000)
+                for image_path in list_of_images[1:-1]:
+                    apng_image.append_file("{}/{}/{}".format("output", ofname, image_path), delay=delay_time)
+                apng_image.append_file("{}/{}/{}".format("output", ofname, list_of_images[-1]), delay=4000)
+                if kwargs.get("do_reverse"):
+                    for image_path in reversed(list_of_images[1:-1]):
+                        apng_image.append_file("{}/{}/{}".format("output", ofname, image_path), delay=delay_time)
+                apng_image.save("{}/{}.png".format("output", ofname))
+            elif kwargs.get("output_type") == "webp":
+                images = list()
+                durations = list()
+                delay_time = int(1000 / line_object.get_fps())
+                ofname = line_object.get_output_folder_name()
+                images_folder = "{}/{}".format("output", ofname)
+                list_of_images = os.listdir(images_folder)
+                
+                images.append(Image.open("{}/{}/{}".format("output", ofname, list_of_images[0])))
+                durations.append(4000)
+
+                for image_path in list_of_images[1:-1]:
+                    images.append(Image.open("{}/{}/{}".format("output", ofname, image_path)))
+                    durations.append(delay_time)
+
+                images.append(Image.open("{}/{}/{}".format("output", ofname, list_of_images[-1])))
+                durations.append(4000)
+
+                if kwargs.get("do_reverse"):
+                    for image_path in reversed(list_of_images[1:-1]):
+                        images.append(Image.open("{}/{}/{}".format("output", ofname, image_path)))
+                        durations.append(delay_time)
+
+                images[0].save("{}/{}.webp".format("output", ofname), save_all=True, append_images=images[1:], duration=durations, loop=0)
+            elif kwargs.get("output_type") == "mp4":
+                ofname = line_object.get_output_folder_name()
+                fps = kwargs.get("fps")
+                images_folder = "{}/{}".format("output", ofname)
+                list_of_images = os.listdir(images_folder)
+                outputfilename = "{}/{}.mp4".format("output", ofname)
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
+                
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+                
+                for image_path in list_of_images[1:-1]:
+                    img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
+                    video_writer.write(img)
+
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+
+                if kwargs.get("do_reverse"):
+                    for image_path in reversed(list_of_images[1:-1]):
+                        img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
+                        video_writer.write(img)
+
+                video_writer.release()
+            # elif kwargs.get("output_type") == "webm":
+            #     images = list()
+            #     durations = list()
+            #     delay_time = 1 / line_object.get_fps()
+            #     ofname = line_object.get_output_folder_name()
+            #     images_folder = "{}/{}".format("output", ofname)
+            #     list_of_images = os.listdir(images_folder)
+                
+            #     images.append("{}/{}/{}".format("output", ofname, list_of_images[0]))
+            #     durations.append(4)
+
+            #     for image_path in list_of_images[1:-1]:
+            #         images.append("{}/{}/{}".format("output", ofname, image_path))
+            #         durations.append(delay_time)
+
+            #     images.append("{}/{}/{}".format("output", ofname, list_of_images[-1]))
+            #     durations.append(4)
+
+            #     if kwargs.get("do_reverse"):
+            #         for image_path in reversed(list_of_images[1:-1]):
+            #             images.append("{}/{}/{}".format("output", ofname, image_path))
+            #             durations.append(delay_time)
+
+            #     print(images)
+            #     clip = ImageSequenceClip(images, durations=durations)
+            #     clip.write_videofile("{}/{}.webm".format("output", ofname), codec="libvpx")
 
         if not kwargs.get("yes"):
             input("Render completed. Press ENTER to exit the script.")
