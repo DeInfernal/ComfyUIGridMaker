@@ -11,6 +11,7 @@ import hashlib
 
 import apng
 import cv2
+import numpy as np
 
 
 class PlotFileRenderer:
@@ -679,11 +680,12 @@ class LineFileRenderer:
             imagepath = "output/{}/{}.png".format(of_name, imgnumber)
             if os.path.exists(imagepath):
                 print("! {}".format(imgnumber))
-                # print("--- {}".format(item_to_generate))
             else:
                 rendered_workflow = line_object.generate_workflow(item_to_generate[1])
                 self.capi.generate_image(rendered_workflow, imagepath)
                 print("+ {}".format(imgnumber))
+            if line_object.debug:
+                print("--- {}".format(item_to_generate))
 
             # And all of this is to track the progress of time. For convinience, of course.
             current_progress += 1
@@ -699,6 +701,7 @@ class LineFileRenderer:
 
     def render(self, line_object, **kwargs):
         self._prepare_folders(line_object)
+        line_object.debug = kwargs.get("debug")
         line_object.set_fps(kwargs.get("fps"))
         line_object.set_ignore_non_replacements(kwargs.get("ignore_non_replacements"))
 
@@ -708,7 +711,7 @@ class LineFileRenderer:
             if "resize_ratio" in kwargs:
                 line_object.set_resize_ratio(kwargs.get("resize_ratio", 1.0))
 
-            if kwargs.get("output_type") == "apng":
+            if "apng" in kwargs.get("output_type"):
                 apng_image = apng.APNG()
                 delay_time = int(1000 / line_object.get_fps())
                 ofname = line_object.get_output_folder_name()
@@ -722,7 +725,8 @@ class LineFileRenderer:
                     for image_path in reversed(list_of_images[1:-1]):
                         apng_image.append_file("{}/{}/{}".format("output", ofname, image_path), delay=delay_time)
                 apng_image.save("{}/{}.png".format("output", ofname))
-            elif kwargs.get("output_type") == "webp":
+            
+            if "webp" in kwargs.get("output_type"):
                 images = list()
                 durations = list()
                 delay_time = int(1000 / line_object.get_fps())
@@ -746,7 +750,8 @@ class LineFileRenderer:
                         durations.append(delay_time)
 
                 images[0].save("{}/{}.webp".format("output", ofname), save_all=True, append_images=images[1:], duration=durations, loop=0)
-            elif kwargs.get("output_type") == "mp4":
+
+            if "mp4" in kwargs.get("output_type"):
                 ofname = line_object.get_output_folder_name()
                 fps = kwargs.get("fps")
                 images_folder = "{}/{}".format("output", ofname)
@@ -773,32 +778,142 @@ class LineFileRenderer:
                         video_writer.write(img)
 
                 video_writer.release()
-            # elif kwargs.get("output_type") == "webm":
-            #     images = list()
-            #     durations = list()
-            #     delay_time = 1 / line_object.get_fps()
-            #     ofname = line_object.get_output_folder_name()
-            #     images_folder = "{}/{}".format("output", ofname)
-            #     list_of_images = os.listdir(images_folder)
+
+            if "mp4_averaged1" in kwargs.get("output_type"):
+                ofname = line_object.get_output_folder_name()
+                fps = kwargs.get("fps")
+                images_folder = "{}/{}".format("output", ofname)
+                list_of_images = os.listdir(images_folder)
+                outputfilename = "{}/{}_averaged1.mp4".format("output", ofname)
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
+
+                # Prepare averaged images first
+                averaged_images = []
+                averaging_radius = 1
+                for i in range(len(list_of_images)):
+                    start = max(0, i - averaging_radius)
+                    end = min(len(list_of_images), i + averaging_radius + 1)
+                    images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
+                    averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
+                    averaged_images.append(averaged_image)
                 
-            #     images.append("{}/{}/{}".format("output", ofname, list_of_images[0]))
-            #     durations.append(4)
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+                
+                for image_file in averaged_images:
+                    video_writer.write(image_file)
 
-            #     for image_path in list_of_images[1:-1]:
-            #         images.append("{}/{}/{}".format("output", ofname, image_path))
-            #         durations.append(delay_time)
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
 
-            #     images.append("{}/{}/{}".format("output", ofname, list_of_images[-1]))
-            #     durations.append(4)
+                if kwargs.get("do_reverse"):
+                    for image_file in reversed(averaged_images):
+                        video_writer.write(image_file)
 
-            #     if kwargs.get("do_reverse"):
-            #         for image_path in reversed(list_of_images[1:-1]):
-            #             images.append("{}/{}/{}".format("output", ofname, image_path))
-            #             durations.append(delay_time)
+                video_writer.release()
 
-            #     print(images)
-            #     clip = ImageSequenceClip(images, durations=durations)
-            #     clip.write_videofile("{}/{}.webm".format("output", ofname), codec="libvpx")
+            if "mp4_averaged2" in kwargs.get("output_type"):
+                ofname = line_object.get_output_folder_name()
+                fps = kwargs.get("fps")
+                images_folder = "{}/{}".format("output", ofname)
+                list_of_images = os.listdir(images_folder)
+                outputfilename = "{}/{}_averaged2.mp4".format("output", ofname)
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
+
+                # Prepare averaged images first
+                averaged_images = []
+                averaging_radius = 2
+                for i in range(len(list_of_images)):
+                    start = max(0, i - averaging_radius)
+                    end = min(len(list_of_images), i + averaging_radius + 1)
+                    images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
+                    averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
+                    averaged_images.append(averaged_image)
+                
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+                
+                for image_file in averaged_images:
+                    video_writer.write(image_file)
+
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+
+                if kwargs.get("do_reverse"):
+                    for image_file in reversed(averaged_images):
+                        video_writer.write(image_file)
+
+                video_writer.release()
+
+            if "mp4_averaged3" in kwargs.get("output_type"):
+                ofname = line_object.get_output_folder_name()
+                fps = kwargs.get("fps")
+                images_folder = "{}/{}".format("output", ofname)
+                list_of_images = os.listdir(images_folder)
+                outputfilename = "{}/{}_averaged3.mp4".format("output", ofname)
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
+
+                # Prepare averaged images first
+                averaged_images = []
+                averaging_radius = 3
+                for i in range(len(list_of_images)):
+                    start = max(0, i - averaging_radius)
+                    end = min(len(list_of_images), i + averaging_radius + 1)
+                    images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
+                    averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
+                    averaged_images.append(averaged_image)
+                
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+                
+                for image_file in averaged_images:
+                    video_writer.write(image_file)
+
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+
+                if kwargs.get("do_reverse"):
+                    for image_file in reversed(averaged_images):
+                        video_writer.write(image_file)
+
+                video_writer.release()
+
+            if "webm" in kwargs.get("output_type"):
+                ofname = line_object.get_output_folder_name()
+                fps = kwargs.get("fps")
+                images_folder = "{}/{}".format("output", ofname)
+                list_of_images = os.listdir(images_folder)
+                outputfilename = "{}/{}.webm".format("output", ofname)
+                fourcc = cv2.VideoWriter_fourcc(*'vp80')
+                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
+                
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+                
+                for image_path in list_of_images[1:-1]:
+                    img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
+                    video_writer.write(img)
+
+                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
+                for _ in range(4 * fps):
+                    video_writer.write(img)
+
+                if kwargs.get("do_reverse"):
+                    for image_path in reversed(list_of_images[1:-1]):
+                        img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
+                        video_writer.write(img)
+
+                video_writer.release()
 
         if not kwargs.get("yes"):
             input("Render completed. Press ENTER to exit the script.")

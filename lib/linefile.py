@@ -64,28 +64,28 @@ class Slider:
                 exit(1)
             if (v_to - v_from > 0 and v_step > 0) or (v_to - v_from < 0 and v_step < 0):
                 while (v_from < v_to and v_step > 0) or (v_from > v_to and v_step < 0):
-                    result.append(v_from)
                     v_from += v_step
+                    result.append(v_from)
                 return result
             else:
                 return result
 
         if self.get_steps():
-            v_step = (v_to - v_from) / (self.get_steps() - 1)
+            v_step = (v_to - v_from) / self.get_steps()
             if (v_to - v_from > 0 and v_step > 0) or (v_to - v_from < 0 and v_step < 0):
                 while (v_from < v_to and v_step > 0) or (v_from > v_to and v_step < 0):
-                    result.append(v_from)
                     v_from += v_step
+                    result.append(v_from)
                 return result
             else:
                 return result
                 
         if self.get_seconds():
-            v_step = (v_to - v_from) / (self.get_seconds() * fps - 1)
+            v_step = (v_to - v_from) / (self.get_seconds() * fps)
             if (v_to - v_from > 0 and v_step > 0) or (v_to - v_from < 0 and v_step < 0):
                 while (v_from < v_to and v_step > 0) or (v_from > v_to and v_step < 0):
-                    result.append(v_from)
                     v_from += v_step
+                    result.append(v_from)
                 return result
             else:
                 return result
@@ -104,6 +104,7 @@ class LineFile:
     resize_ratio = None
     fps = None
     ignore_non_replacements = False
+    debug = False
     
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:

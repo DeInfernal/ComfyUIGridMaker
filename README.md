@@ -344,7 +344,7 @@ Arguments has also been tweaked a bit.
 
 * `--comfyui_ip` - still specifies a either web-address or ip-address of your comfyui. By default it is 127.0.0.1, meaning, the script thinks ComfyUI runs on your local computer.
 * `--comfyui_port` - still specifies a port of your comfyui. By default it is 8188, meaning, the script thinks ComfyUI never changed it's local port.
-* `--output_type` - allows you to specify the output of your final animation. By default it is "webp", but can also output "mp4" and "apng"
+* `--output_type` - allows you to specify the output of your final animation. By default it is "webp", but can also output "mp4", "webm" and "apng", as well as "mp4_averaged1", "mp4_averaged2", "mp4_averaged3" (winch will average 3, 5 or 7 images around selected, resulting in more of a smooth transitions)
 * `--fps` - allows you to specify how much frames per second you want to see. By default it is 24.
 * `--skip_compilation` - a very specific flag - if set, the program will skip the final animation generation
 * `--do_reverse` - if set, then animation will first go from first slider to the last, as usual, and then at the end, will reverse, and go from last slider back to first.
