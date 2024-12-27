@@ -47,6 +47,7 @@ class PlotFile:
     flip_last_axis = False
     autoflip_last_axis = False
     do_hash_filenames = False
+    cleanup = False
     
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:
@@ -162,6 +163,12 @@ class PlotFile:
 
     def set_do_hash_filenames(self, new_do_hash_filenames):
         self.do_hash_filenames = new_do_hash_filenames
+
+    def get_cleanup(self):
+        return self.cleanup
+
+    def set_cleanup(self, new_cleanup):
+        self.cleanup = new_cleanup
 
     def _replace_system_variables(self, string_workflow):
         replacement_amount = 0

@@ -228,6 +228,7 @@ Your result will wait for you in `OUTPUT` folder.
 * `--skip_mass_generation` - a very specific flag - if set, the program will skip the final XY-plot generation (so it will only make images that composes the plot, but not the plot itself).
 * `--make_html_table` - in addition (or, if --skip_mass_generation is supplied, standalone) to graphical table, make an interactive HTML page where every single picture could be clicked, enlarged, etc.
 * `--yes` - when generation is finished, the script will wait till you press 'enter' to finish it. Supply it with '--yes' flag, and it will not ask for any key, but shut down when it finishes.
+* `--cleanup` - before generation, check the output folder and delete every file that is not matching the filenames that **should** be here.
 * `--ignore_non_replacements` - another specific flag. If NOT set, then at the stage of replacing dynamic variables with values (found in Axises), if after replacing the variable, nothing has changed in the workflow, the program will halt with error, possibly notifying you that what you about to generate will look the same as your previous generations (since there was nothing to change in the first place anywhere). If you are somehow OKAY with that, and asknowledge that there is a points in script where nothing will change - you must set this flag, so program will not halt at those stages.
 
 
@@ -344,8 +345,9 @@ Arguments has also been tweaked a bit.
 
 * `--comfyui_ip` - still specifies a either web-address or ip-address of your comfyui. By default it is 127.0.0.1, meaning, the script thinks ComfyUI runs on your local computer.
 * `--comfyui_port` - still specifies a port of your comfyui. By default it is 8188, meaning, the script thinks ComfyUI never changed it's local port.
-* `--output_type` - allows you to specify the output of your final animation. By default it is "webp", but can also output "mp4", "webm" and "apng", as well as "mp4_averaged1", "mp4_averaged2", "mp4_averaged3" (winch will average 3, 5 or 7 images around selected, resulting in more of a smooth transitions)
+* `--output_type` - allows you to specify the output of your final animation. By default it is "webp", but can also output "mp4", "webm" and "apng", as well as "mp4_averaged1", "mp4_averaged2", "mp4_averaged3" and "webp_averaged1",  "webp_averaged2" and "webp_averaged3" (winch will average 3, 5 or 7 images around selected, resulting in more of a smooth transitions)
 * `--fps` - allows you to specify how much frames per second you want to see. By default it is 24.
+* `--skip_rendering` - a very specific flag - if set, the program will skip the image rendering and go straight to making the animation from files that already present in the output folder
 * `--skip_compilation` - a very specific flag - if set, the program will skip the final animation generation
 * `--do_reverse` - if set, then animation will first go from first slider to the last, as usual, and then at the end, will reverse, and go from last slider back to first.
 * `--yes` - when generation is finished, the script will wait till you press 'enter' to finish it. Supply it with '--yes' flag, and it will not ask for any key, but shut down when it finishes.

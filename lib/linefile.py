@@ -63,7 +63,7 @@ class Slider:
                 input("Press enter to exit")
                 exit(1)
             if (v_to - v_from > 0 and v_step > 0) or (v_to - v_from < 0 and v_step < 0):
-                while (v_from < v_to and v_step > 0) or (v_from > v_to and v_step < 0):
+                while (v_from < v_to-0.00001 and v_step > 0) or (v_from > v_to+0.00001 and v_step < 0):
                     v_from += v_step
                     result.append(v_from)
                 return result
@@ -73,7 +73,7 @@ class Slider:
         if self.get_steps():
             v_step = (v_to - v_from) / self.get_steps()
             if (v_to - v_from > 0 and v_step > 0) or (v_to - v_from < 0 and v_step < 0):
-                while (v_from < v_to and v_step > 0) or (v_from > v_to and v_step < 0):
+                while (v_from < v_to-0.00001 and v_step > 0) or (v_from > v_to+0.00001 and v_step < 0):
                     v_from += v_step
                     result.append(v_from)
                 return result
@@ -83,7 +83,7 @@ class Slider:
         if self.get_seconds():
             v_step = (v_to - v_from) / (self.get_seconds() * fps)
             if (v_to - v_from > 0 and v_step > 0) or (v_to - v_from < 0 and v_step < 0):
-                while (v_from < v_to and v_step > 0) or (v_from > v_to and v_step < 0):
+                while (v_from < v_to-0.00001 and v_step > 0) or (v_from > v_to+0.00001 and v_step < 0):
                     v_from += v_step
                     result.append(v_from)
                 return result

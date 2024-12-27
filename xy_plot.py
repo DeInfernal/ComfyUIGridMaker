@@ -2,13 +2,14 @@ import argparse
 
 from comfyui_api import ComfyUIAPI
 from lib.plotfile import PlotFile
-from lib.renderer import PlotFileRenderer
+from lib.plotfilerenderer import PlotFileRenderer
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--comfyui_ip", type=str, help="IP of ComfyUI interface", default="127.0.0.1")
     parser.add_argument("--comfyui_port", type=str, help="Port of ComfyUI interface", default="8188")
+    parser.add_argument("--cleanup", action="store_true", help="Set the flag to delete images that is not the same name as the ones you want to generate.")
     parser.add_argument("--skip_mass_generation", action="store_true", help="Set the flag to skip the step with generation of XY plot (only make images)")
     parser.add_argument("--make_html_table", action="store_true", help="Set the flag to make HTML version of the table too.")
     parser.add_argument("--ignore_non_replacements", action="store_true", help="Set the flag to True if you are fine that on Axis variable replacement step there can be no replacements to workflow")
@@ -33,6 +34,7 @@ if __name__ == "__main__":
     kwargs.setdefault("autoflip_last_axis", args.autoflip_last_axis)
     kwargs.setdefault("make_html_table", args.make_html_table)
     kwargs.setdefault("hash_filenames", args.hash_filenames)
+    kwargs.setdefault("cleanup", args.cleanup)
     kwargs.setdefault("yes", args.yes)
     if args.resize_ratio is not None:
         kwargs.setdefault("resize_ratio", args.resize_ratio)

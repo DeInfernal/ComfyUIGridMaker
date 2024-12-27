@@ -1,5 +1,4 @@
 from lib.plotfile import PlotFile, Axis
-from lib.linefile import LineFile, Slider
 from PIL import Image, ImageDraw, ImageFont
 from comfyui_api import ComfyUIAPI
 from lib.filename_sanitizer import sanitize_filename
@@ -8,10 +7,6 @@ from lib.htmlrenderer import html_render
 import os
 import time
 import hashlib
-
-import apng
-import cv2
-import numpy as np
 
 
 class PlotFileRenderer:
@@ -82,16 +77,11 @@ class PlotFileRenderer:
 
         return sanitize_filename(filename)
 
-    def _render_all_images(self, plot_object, *axis_objects):
-        print("Generation/Rendering: Started at {}...".format(time.ctime()))
-
+    def _generate_variables_filenames_pairs(self, plot_object, *axis_objects):
         # Just a preflight checks...
         for axis_object in axis_objects:
             if not isinstance(axis_object, Axis):
-                raise Exception("_render_all_images received a non-axis object {} - script shutdowned".format(axis_object))
-
-        # Some variables for convinience
-        of_name = plot_object.get_output_folder_name()
+                raise Exception("_generate_variables_filenames_pairs received a non-axis object {} - script shutdowned".format(axis_object))
 
         # Order the axises so when tuples are generated, the first axises should change first, or be overwritten by order
         unordered_axises = list([[axobj.get_order(), axobj] for axobj in axis_objects])
@@ -127,6 +117,42 @@ class PlotFileRenderer:
                 else:  # Else treat it as string
                     variables.setdefault(variable_name[1], item_to_generate[variable_name[0]])
             all_items_to_generate.append((variables, self._generate_filename_for_image(variables, plot_object.get_do_hash_filenames())))
+        
+        return all_items_to_generate
+
+    def _cleanup_redundant_files(self, directory_to_check, filenames_to_keep):
+        filenames = os.listdir("{}/{}".format("output", directory_to_check))
+        set_existing = set(filenames)
+        set_should_exist = set(filenames_to_keep)
+        set_to_delete = set_existing.difference(set_should_exist)
+        for item in set_to_delete:
+            print("- Deleted redundant file {}".format(item))
+            os.remove("{}/{}/{}".format("output", directory_to_check, item))
+
+    def _filter_only_nonexistent_files(self, of_name, unfiltered_items_to_generate):
+        filtered_items_to_generate = list()
+        for item in unfiltered_items_to_generate:
+            imagepath = "{}/{}/{}.png".format("output", of_name, item[1])
+            if not os.path.exists(imagepath):
+                filtered_items_to_generate.append(item)
+        return filtered_items_to_generate
+
+    def _render_all_images(self, plot_object, *axis_objects):
+        print("Generation/Rendering: Started at {}...".format(time.ctime()))
+
+        # Some variables for convinience
+        of_name = plot_object.get_output_folder_name()
+
+        # Make filename-other pairs, filtered by existence (so only seek files that doesn't exist)
+        all_items_to_generate = self._generate_variables_filenames_pairs(plot_object, *axis_objects)
+        print("The XY plot consists of {} images.".format(len(all_items_to_generate)))
+
+        # If there is cleanup then clean up.
+        if plot_object.get_cleanup():
+            filenames_to_cleanup = ["{}.png".format(x[1]) for x in all_items_to_generate]
+            self._cleanup_redundant_files(of_name, filenames_to_cleanup)
+
+        all_items_to_generate = self._filter_only_nonexistent_files(of_name, all_items_to_generate)
 
         # Finally, generate all images.
         # ...also track time, just for convinience.
@@ -134,12 +160,12 @@ class PlotFileRenderer:
         current_progress = 0
         maximum_progress = len(all_items_to_generate)
 
-        print("Preparing to generate {} images...".format(maximum_progress))
+        print("Preparing to generate {} images that wasn't found on the PC...".format(maximum_progress))
 
         for item_to_generate in all_items_to_generate:
             imagepath = "output/{}/{}.png".format(of_name, item_to_generate[1])
             if os.path.exists(imagepath):
-                print("! {}".format(item_to_generate[1]))
+                print("! {}".format(item_to_generate[1]))  # Technically speaking, this is quite worthless as I already filter nonexistants, but... well, let it be here for purposes.
             else:
                 rendered_workflow = plot_object.generate_workflow(item_to_generate[0])
                 self.capi.generate_image(rendered_workflow, imagepath)
@@ -593,6 +619,7 @@ class PlotFileRenderer:
         self._prepare_folders(plot_object)
 
         plot_object.set_do_hash_filenames(kwargs.get("hash_filenames"))
+        plot_object.set_cleanup(kwargs.get("cleanup"))
 
         if kwargs.get("make_html_table"):  # We will make the file beforehand so it can be filled dynamically! >:D
             with open("output/{}{}.html".format(plot_object.get_output_folder_name(), plot_object.get_output_file_suffix()), "w", encoding="utf-8") as fstream:
@@ -618,302 +645,6 @@ class PlotFileRenderer:
                     image = image.resize((int(image.width*newratio), int(image.height*newratio)))
 
             image.save("output/{}{}.png".format(plot_object.get_output_folder_name(), plot_object.get_output_file_suffix()))
-
-        if not kwargs.get("yes"):
-            input("Render completed. Press ENTER to exit the script.")
-
-
-class LineFileRenderer:
-    capi = None
-
-    def __init__(self, comfyui_api) -> None:
-        if not isinstance(comfyui_api, ComfyUIAPI):
-            raise Exception("Cannot initalize LineFileRenderer - no ComfyUIAPI object provided.")
-        self.capi = comfyui_api
-
-    def _prepare_folders(self, line_object):
-        os.makedirs("{}/{}".format("output", line_object.get_output_folder_name()), exist_ok=True)
-
-    def _clone_workflowstate(self, workflow_state):
-        new_workflow_state = dict()
-        for item in workflow_state:
-            new_workflow_state.setdefault(item, str(workflow_state.get(item)))
-        return new_workflow_state
-
-    def _render_all_images(self, line_object, *sliders_objects):
-        print("Generation/Rendering: Started at {}...".format(time.ctime()))
-
-        # Just a preflight checks...
-        for slider_object in sliders_objects:
-            if not isinstance(slider_object, Slider):
-                raise Exception("_render_all_images received a non-slider object {} - script shutdowned".format(slider_object))
-
-        # Some variables for convinience
-        of_name = line_object.get_output_folder_name()
-
-        # Build initial workflow state
-        workflow_state = line_object.get_initial_workflow_state()
-        
-        # Build queue of images and fill it with first image
-        image_queue = list()
-        image_queue.append(self._clone_workflowstate(workflow_state))
-        
-        # Now go and make each slider slide.
-        for slider in sliders_objects:
-            current_varname = slider.get_variable_name()
-            current_from = workflow_state.get(current_varname)
-            list_of_frames = slider.compile(current_from, line_object.get_fps())
-            for frame in list_of_frames:
-                workflow_state[current_varname] = frame
-                image_queue.append(self._clone_workflowstate(workflow_state))
-
-        # Finally, generate all images.
-        # ...also track time, just for convinience.
-        current_timestamp = time.time()
-        current_progress = 0
-        maximum_progress = len(image_queue)
-
-        print("Preparing to generate {} images...".format(maximum_progress))
-
-        for item_to_generate in enumerate(image_queue):
-            imgnumber = str(item_to_generate[0]).zfill(8)
-            imagepath = "output/{}/{}.png".format(of_name, imgnumber)
-            if os.path.exists(imagepath):
-                print("! {}".format(imgnumber))
-            else:
-                rendered_workflow = line_object.generate_workflow(item_to_generate[1])
-                self.capi.generate_image(rendered_workflow, imagepath)
-                print("+ {}".format(imgnumber))
-            if line_object.debug:
-                print("--- {}".format(item_to_generate))
-
-            # And all of this is to track the progress of time. For convinience, of course.
-            current_progress += 1
-            progress_percentage = current_progress/maximum_progress*10000//1/100
-            new_timestamp = time.time()
-            elapsed_time = (new_timestamp - current_timestamp) * 100 // 1 / 100
-            seconds_left_till_finish = (maximum_progress - current_progress) * elapsed_time
-            sensible_time_timestamp = time.ctime(new_timestamp + seconds_left_till_finish)
-            print("Progress: {} of {} ({}%), ETA of completion: {}.".format(current_progress, maximum_progress, progress_percentage, sensible_time_timestamp))
-            current_timestamp = new_timestamp
-
-        print("Generation/Rendering: Finished at {}...".format(time.ctime()))
-
-    def render(self, line_object, **kwargs):
-        self._prepare_folders(line_object)
-        line_object.debug = kwargs.get("debug")
-        line_object.set_fps(kwargs.get("fps"))
-        line_object.set_ignore_non_replacements(kwargs.get("ignore_non_replacements"))
-
-        self._render_all_images(line_object, *line_object.sliders)
-
-        if not kwargs.get("skip_compilation"):
-            if "resize_ratio" in kwargs:
-                line_object.set_resize_ratio(kwargs.get("resize_ratio", 1.0))
-
-            if "apng" in kwargs.get("output_type"):
-                apng_image = apng.APNG()
-                delay_time = int(1000 / line_object.get_fps())
-                ofname = line_object.get_output_folder_name()
-                images_folder = "{}/{}".format("output", ofname)
-                list_of_images = os.listdir(images_folder)
-                apng_image.append_file("{}/{}/{}".format("output", ofname, list_of_images[0]), delay=4000)
-                for image_path in list_of_images[1:-1]:
-                    apng_image.append_file("{}/{}/{}".format("output", ofname, image_path), delay=delay_time)
-                apng_image.append_file("{}/{}/{}".format("output", ofname, list_of_images[-1]), delay=4000)
-                if kwargs.get("do_reverse"):
-                    for image_path in reversed(list_of_images[1:-1]):
-                        apng_image.append_file("{}/{}/{}".format("output", ofname, image_path), delay=delay_time)
-                apng_image.save("{}/{}.png".format("output", ofname))
-            
-            if "webp" in kwargs.get("output_type"):
-                images = list()
-                durations = list()
-                delay_time = int(1000 / line_object.get_fps())
-                ofname = line_object.get_output_folder_name()
-                images_folder = "{}/{}".format("output", ofname)
-                list_of_images = os.listdir(images_folder)
-                
-                images.append(Image.open("{}/{}/{}".format("output", ofname, list_of_images[0])))
-                durations.append(4000)
-
-                for image_path in list_of_images[1:-1]:
-                    images.append(Image.open("{}/{}/{}".format("output", ofname, image_path)))
-                    durations.append(delay_time)
-
-                images.append(Image.open("{}/{}/{}".format("output", ofname, list_of_images[-1])))
-                durations.append(4000)
-
-                if kwargs.get("do_reverse"):
-                    for image_path in reversed(list_of_images[1:-1]):
-                        images.append(Image.open("{}/{}/{}".format("output", ofname, image_path)))
-                        durations.append(delay_time)
-
-                images[0].save("{}/{}.webp".format("output", ofname), save_all=True, append_images=images[1:], duration=durations, loop=0)
-
-            if "mp4" in kwargs.get("output_type"):
-                ofname = line_object.get_output_folder_name()
-                fps = kwargs.get("fps")
-                images_folder = "{}/{}".format("output", ofname)
-                list_of_images = os.listdir(images_folder)
-                outputfilename = "{}/{}.mp4".format("output", ofname)
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
-                
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-                
-                for image_path in list_of_images[1:-1]:
-                    img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
-                    video_writer.write(img)
-
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-
-                if kwargs.get("do_reverse"):
-                    for image_path in reversed(list_of_images[1:-1]):
-                        img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
-                        video_writer.write(img)
-
-                video_writer.release()
-
-            if "mp4_averaged1" in kwargs.get("output_type"):
-                ofname = line_object.get_output_folder_name()
-                fps = kwargs.get("fps")
-                images_folder = "{}/{}".format("output", ofname)
-                list_of_images = os.listdir(images_folder)
-                outputfilename = "{}/{}_averaged1.mp4".format("output", ofname)
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
-
-                # Prepare averaged images first
-                averaged_images = []
-                averaging_radius = 1
-                for i in range(len(list_of_images)):
-                    start = max(0, i - averaging_radius)
-                    end = min(len(list_of_images), i + averaging_radius + 1)
-                    images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
-                    averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
-                    averaged_images.append(averaged_image)
-                
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-                
-                for image_file in averaged_images:
-                    video_writer.write(image_file)
-
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-
-                if kwargs.get("do_reverse"):
-                    for image_file in reversed(averaged_images):
-                        video_writer.write(image_file)
-
-                video_writer.release()
-
-            if "mp4_averaged2" in kwargs.get("output_type"):
-                ofname = line_object.get_output_folder_name()
-                fps = kwargs.get("fps")
-                images_folder = "{}/{}".format("output", ofname)
-                list_of_images = os.listdir(images_folder)
-                outputfilename = "{}/{}_averaged2.mp4".format("output", ofname)
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
-
-                # Prepare averaged images first
-                averaged_images = []
-                averaging_radius = 2
-                for i in range(len(list_of_images)):
-                    start = max(0, i - averaging_radius)
-                    end = min(len(list_of_images), i + averaging_radius + 1)
-                    images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
-                    averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
-                    averaged_images.append(averaged_image)
-                
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-                
-                for image_file in averaged_images:
-                    video_writer.write(image_file)
-
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-
-                if kwargs.get("do_reverse"):
-                    for image_file in reversed(averaged_images):
-                        video_writer.write(image_file)
-
-                video_writer.release()
-
-            if "mp4_averaged3" in kwargs.get("output_type"):
-                ofname = line_object.get_output_folder_name()
-                fps = kwargs.get("fps")
-                images_folder = "{}/{}".format("output", ofname)
-                list_of_images = os.listdir(images_folder)
-                outputfilename = "{}/{}_averaged3.mp4".format("output", ofname)
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
-
-                # Prepare averaged images first
-                averaged_images = []
-                averaging_radius = 3
-                for i in range(len(list_of_images)):
-                    start = max(0, i - averaging_radius)
-                    end = min(len(list_of_images), i + averaging_radius + 1)
-                    images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
-                    averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
-                    averaged_images.append(averaged_image)
-                
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-                
-                for image_file in averaged_images:
-                    video_writer.write(image_file)
-
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-
-                if kwargs.get("do_reverse"):
-                    for image_file in reversed(averaged_images):
-                        video_writer.write(image_file)
-
-                video_writer.release()
-
-            if "webm" in kwargs.get("output_type"):
-                ofname = line_object.get_output_folder_name()
-                fps = kwargs.get("fps")
-                images_folder = "{}/{}".format("output", ofname)
-                list_of_images = os.listdir(images_folder)
-                outputfilename = "{}/{}.webm".format("output", ofname)
-                fourcc = cv2.VideoWriter_fourcc(*'vp80')
-                video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
-                
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-                
-                for image_path in list_of_images[1:-1]:
-                    img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
-                    video_writer.write(img)
-
-                img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[-1]))
-                for _ in range(4 * fps):
-                    video_writer.write(img)
-
-                if kwargs.get("do_reverse"):
-                    for image_path in reversed(list_of_images[1:-1]):
-                        img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
-                        video_writer.write(img)
-
-                video_writer.release()
 
         if not kwargs.get("yes"):
             input("Render completed. Press ENTER to exit the script.")
