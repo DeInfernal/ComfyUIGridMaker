@@ -2,4 +2,5 @@ pillow==10.4.0
 pyyaml==6.0.2
 apng==0.3.4
 opencv-python==4.10.0.84
+Jinja2==3.1.5
 comfyui_api @ git+https://github.com/DeInfernal/comfyui_api.git@v1.0.1

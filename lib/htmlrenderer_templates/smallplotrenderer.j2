@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Rendered smallplot of {{ RENDER_TITLE }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffc;
+            margin: 0;
+            padding: 20px;
+        }
+        img.plot_img {
+            max-width: {{ PREVIEW_IMAGE_WIDTH }}px;
+            max-height: {{ PREVIEW_IMAGE_HEIGHT }}px;
+            transition: transform 0.3s ease, z-index 0s linear 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+        img.plot_img:hover {
+            transform: scale(2);
+            z-index: 10;
+        }
+        td {
+            padding: 1px;
+            text-align: center;
+            position: relative;
+        }
+        table {
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+
+        .overlay {
+            display: none;    /* Hidden by default */
+            position: fixed;  /* Stay in place */
+            top: 0;
+            left: 0;
+            width: 100%;  /* Full width of screen */
+            height: 100%; /* Full height of screen */
+            background-color: rgba(0, 0, 0, 0.8);  /* Black background with some opacity */
+            justify-content: center;  /* Center the contents */
+            align-items: center;      /* Center the contents */
+            z-index: 1000;  /* Sit on top of everything */
+        }
+        .overlay img {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-50%);
+            max-width: 90%;   /* Either full size of image or 90pct of screen, winch is higher */
+            max-height: 80%;  /* Either full size of image or 80pct of screen, winch is higher */
+        }
+        .overlay-text {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            padding: 10px;
+        }
+
+        .red {
+            color: #c00;
+            font: bold 16pt;
+        }
+
+        .hidden {
+            display: none;
+        }
+        
+        select.selectorDimension {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Rendered smallplot of {{ RENDER_TITLE }}</h1>
+
+<table>
+<tr>
+<td>
+    <h2>1. Dimensions</h2>
+    <div>
+        <span class="red">X (horizontal) Dimension: </span>
+        <select id="xDimension">
+{% for single_item in SORTING_OBJECT %}
+            <option value="{{ single_item["axis_id"] }}">{{ single_item["axis_name"] }}</option>
+{% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <span class="red">Y (vertical) Dimension: </span>
+        <select id="yDimension">
+{% for single_item in SORTING_OBJECT %}
+            <option value="{{ single_item["axis_id"] }}">{{ single_item["axis_name"] }}</option>
+{% endfor %}
+        </select>
+    </div>
+</td>
+<td>
+    <h2>2. Selectors</h2>
+{% for single_item in SORTING_OBJECT %}
+<div class="selectorDimension" data-axis-id={{ single_item["axis_id"] }}>
+    <span class="red">{{ single_item["axis_name"] }}: </span>
+    <select class="selectorDimension" data-axis-id={{ single_item["axis_id"] }}>
+{% for single_value in single_item["l_values"] %}
+        <option value={{ single_value["value_id"] }}>{{ single_value["value_name"] }}</option>
+{% endfor %}
+    </select>
+</div>
+{% endfor %}
+</td>
+<td>
+    <h2>3. Render</h2>
+    <button id="renderButton">Render</button>
+</td>
+</table>
+
+<div id="grid"></div>
+
+<div class="overlay" id="overlay">
+    <img id="overlayImage" src="" alt="">
+    <div id="overlayText" class="overlay-text"></div>
+</div>
+
+<script>
+    const all_renders_database = [
+{% for single_item in TOTAL_FILE_LIST %}
+    { pos: {{ single_item[0] }}, file: "{{ OUTPUT_FOLDER_NAME }}/{{ single_item[1] }}.png", caption: "{{ single_item[2] }}" },
+{% endfor %}
+    ];
+
+    const all_sorting_objects = {{ SORTING_OBJECT }};
+
+    const xDimensionSelect = document.getElementById("xDimension");
+    const yDimensionSelect = document.getElementById("yDimension");
+    const allSelectors = document.querySelectorAll("select.selectorDimension");
+    const allSelectorsDiv = document.querySelectorAll("div.selectorDimension");
+
+    // Change visible selectors depending on winch Dimensions selected.
+    function refreshSelectorsVisibility() {
+        allSelectorsDiv.forEach(selector => {
+            if (selector.dataset.axisId === xDimensionSelect.value || selector.dataset.axisId === yDimensionSelect.value) {
+                selector.classList.add("hidden");
+            } else {
+                selector.classList.remove("hidden");
+            }
+        });
+    }
+
+    xDimensionSelect.addEventListener("change", refreshSelectorsVisibility);
+    yDimensionSelect.addEventListener("change", refreshSelectorsVisibility);
+    refreshSelectorsVisibility();
+
+    function matchTwoObjects(num1, num2) {
+        for (const key in num2) {
+            if (num1[key] !== num2[key]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function searchInDatabase(key) {
+        console.log("search for", key);
+        for (const db_entry in all_renders_database) {
+            if (matchTwoObjects(all_renders_database[db_entry]["pos"], key)) {
+                return [all_renders_database[db_entry]["file"], all_renders_database[db_entry]["caption"]];
+            }
+        }
+        return ["", ""];
+    }
+
+    const overlay = document.getElementById('overlay');
+    const overlayImage = document.getElementById('overlayImage');
+    const overlayText = document.getElementById('overlayText');
+
+    // Close the overlay when clicking outside the image
+    overlay.addEventListener('click', () => {
+        overlay.style.display = 'none';
+    });
+
+    // Assemble the new Table
+    function assembleTheTable() {
+        const theTable = document.createElement('table');
+
+        const xAxisId = xDimensionSelect.value;
+        const yAxisId = yDimensionSelect.value;
+
+        // First: Create the upper (X) row.
+        const firstRow = document.createElement('tr');
+        firstRow.appendChild(document.createElement('td'));  // Empty TD.
+        for (let i = 0; i < all_sorting_objects[xAxisId]["l_values"].length; i++) {
+            const newTd = document.createElement('td');
+            newTd.innerHTML = all_sorting_objects[xAxisId]["axis_name"] + " = " + all_sorting_objects[xAxisId]["l_values"][i]["value_name"];
+            firstRow.appendChild(newTd);
+        }
+
+        theTable.appendChild(firstRow);
+
+        // Create vertical rows (Y)
+        for (let j = 0; j < all_sorting_objects[yAxisId]["l_values"].length; j++) {
+            const newTr = document.createElement('tr');
+            
+            const yNameTd = document.createElement('td');
+            yNameTd.innerHTML = all_sorting_objects[yAxisId]["axis_name"] + " = " + all_sorting_objects[yAxisId]["l_values"][j]["value_name"];
+            newTr.appendChild(yNameTd);
+
+            for (let i = 0; i < all_sorting_objects[xAxisId]["l_values"].length; i++) {
+                const newTd = document.createElement('td');
+
+                // Fill current selectors. All of them.
+                let image_object_selector = Array();
+                allSelectors.forEach(selector => { image_object_selector[selector.dataset.axisId] = parseInt(selector.value); });
+
+                // Now fill the current item ids
+                image_object_selector[xAxisId] = i;
+                image_object_selector[yAxisId] = j;
+
+                // Now search for the object with same items in the database
+                const search = searchInDatabase(image_object_selector);
+
+                const newImage = document.createElement('img');
+                newImage.src = search[0];
+                newImage.dataset.caption = search[1];
+                newImage.classList.add("plot_img");
+                newImage.addEventListener('click', () => {
+                    overlayImage.src = newImage.src;
+                    overlayText.innerText = newImage.getAttribute('data-caption');
+                    overlay.style.display = 'block';
+                });
+
+                newTd.appendChild(newImage);
+
+                newTr.appendChild(newTd);
+            }
+
+            theTable.appendChild(newTr);
+        }
+
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        grid.appendChild(theTable);
+    }
+
+    document.getElementById('renderButton').addEventListener('click', assembleTheTable);
+</script>
+
+</body>
+</html>

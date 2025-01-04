@@ -1,4 +1,4 @@
-def sanitize_filename(unsanitized_filename: str, replacement_symbol = "_"):
+def sanitize_filename(unsanitized_filename: str, replacement_symbol="_"):
     sanitized_filename = unsanitized_filename.replace("<", replacement_symbol) \
                                              .replace(">", replacement_symbol) \
                                              .replace(":", replacement_symbol) \

@@ -6,11 +6,12 @@ class Axis:
     variablename = None
     objects = None
     order = None
-    
+    id = None
+
     def __lt__(self, other):
         return self.get_sorting_variable_name() < other.get_sorting_variable_name()
-    
-    def __init__(self, axis_object):
+
+    def __init__(self, axis_object, axis_id: int):
         if "replace" not in axis_object:
             raise Exception("In description of axis {} I cannot find 'replace' (string type, Variable name to search) object.".format(axis_object))
         if "with" not in axis_object:
@@ -18,6 +19,7 @@ class Axis:
         self.variablename = axis_object.get("replace")
         self.objects = axis_object.get("with")
         self.order = axis_object.get("order", 0)
+        self.id = axis_id
 
     def get_variable_name(self):
         return self.variablename
@@ -25,14 +27,24 @@ class Axis:
     def get_sorting_variable_name(self):
         return self.variablename if isinstance(self.variablename, str) else self.variablename[0]
 
+    def get_object_id(self, id: int):
+        return self.objects[id]
+
     def get_objects(self):
         return self.objects
+
+    def get_objects_as_ids(self):
+        return list(range(len(self.objects)))
 
     def get_object_count(self):
         return len(self.objects)
 
     def get_order(self):
         return self.order
+
+    def get_id(self):
+        return self.id
+
 
 class PlotFile:
     content = None
@@ -48,19 +60,21 @@ class PlotFile:
     autoflip_last_axis = False
     do_hash_filenames = False
     cleanup = False
-    
+
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:
             self.content = yaml.safe_load(fstream)
-        
+
         if not isinstance(self.content, dict):
             raise Exception("PlotFile is not a dictionary object.")
 
         if "Axises" not in self.content:
             raise Exception("A correct Axises must be present in PlotFile.")
         self.axises = list()
+        tmp_axis_id = 0
         for axis in self.content.get("Axises"):
-            self.axises.append(Axis(axis))
+            self.axises.append(Axis(axis, tmp_axis_id))
+            tmp_axis_id += 1
 
         if "Variables" not in self.content:
             print("Variables dictionary not found - making it empty.")
@@ -157,7 +171,7 @@ class PlotFile:
 
     def set_autoflip_last_axis(self, new_autoflip_last_axis):
         self.autoflip_last_axis = new_autoflip_last_axis
-        
+
     def get_do_hash_filenames(self):
         return self.do_hash_filenames
 
@@ -179,7 +193,7 @@ class PlotFile:
             if new_string_workflow != resulting_string_workflow:
                 replacement_amount += 1
             resulting_string_workflow = new_string_workflow
-        
+
         return resulting_string_workflow, replacement_amount
 
     def _replace_static_variables(self, string_workflow):
@@ -191,7 +205,7 @@ class PlotFile:
             if new_string_workflow != resulting_string_workflow:
                 replacement_amount += 1
             resulting_string_workflow = new_string_workflow
-        
+
         return resulting_string_workflow, replacement_amount
 
     def _replace_dynamic_variables(self, string_workflow, values: dict):
@@ -203,7 +217,7 @@ class PlotFile:
             if new_string_workflow != resulting_string_workflow:
                 replacement_amount += 1
             resulting_string_workflow = new_string_workflow
-        
+
         return resulting_string_workflow, replacement_amount
 
     def _replace_all_variables(self, string_workflow, values: dict):
@@ -220,7 +234,7 @@ class PlotFile:
         # Initially replace static variables.
         for variable in self.variables:
             new_string_workflow = string_workflow.replace(variable, str(self.variables.get(variable)))
-            
+
             if not self.ignore_non_replacements and new_string_workflow == string_workflow:
                 print("ERROR! HALT! ERROR! HALT! ERROR! HALT!")
                 print("HALT! ERROR! HALT! ERROR! HALT! ERROR!")
@@ -234,7 +248,7 @@ class PlotFile:
                 print()
                 input("Press enter to exit program.")
                 exit(0)
-                
+
             string_workflow = new_string_workflow
 
         # Initially replace dynamic variables.
@@ -263,7 +277,7 @@ class PlotFile:
         while replacement_cycles < 128 and last_replacement_count > 0:
             replacement_cycles += 1
             string_workflow, last_replacement_count = self._replace_all_variables(string_workflow, values)
-        
+
         if replacement_cycles > 127:
             print("ERROR! HALT! ERROR! HALT! ERROR! HALT!")
             print("HALT! ERROR! HALT! ERROR! HALT! ERROR!")
@@ -273,7 +287,7 @@ class PlotFile:
             print("This indicates recursive replacement somewhere. Fix it manually.")
             print()
             input("Press enter to exit program.")
-            exit(0) 
+            exit(0)
 
         # Render workflow.
         # print(string_workflow)  # Debugging purposes

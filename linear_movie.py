@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument("linefile", type=str, help="Path to PLOTFILE")
     return parser.parse_args()
 
+
 if __name__ == "__main__":
     args = parse_args()
     linefile = LineFile(args.linefile)

@@ -9,10 +9,10 @@ class Slider:
     varstep = None
     varsteps = None
     varseconds = None
-    
+
     def __lt__(self, other):
         return self.get_sorting_variable_name() < other.get_sorting_variable_name()
-    
+
     def __init__(self, slider_object):
         if "slider" not in slider_object:
             raise Exception("In description of slider {} I cannot find 'slider' (string type, Variable name to search) object.".format(slider_object))
@@ -48,13 +48,13 @@ class Slider:
     def get_seconds(self):
         return self.varseconds
 
-    def compile(self, float_from = None, fps = 24):
+    def compile(self, float_from=None, fps=24):
         if float_from is not None:
             v_from = float_from
         else:
             v_from = self.get_from()
         v_to = self.get_to()
-        
+
         result = list()
         if self.get_step():
             v_step = self.get_step()
@@ -79,7 +79,7 @@ class Slider:
                 return result
             else:
                 return result
-                
+
         if self.get_seconds():
             v_step = (v_to - v_from) / (self.get_seconds() * fps)
             if (v_to - v_from > 0 and v_step > 0) or (v_to - v_from < 0 and v_step < 0):
@@ -94,6 +94,7 @@ class Slider:
         input("Press enter to exit")
         exit(1)
 
+
 class LineFile:
     content = None
     workflow_stencil = None
@@ -105,11 +106,11 @@ class LineFile:
     fps = None
     ignore_non_replacements = False
     debug = False
-    
+
     def __init__(self, plotfile_path):
         with open(plotfile_path, "r", encoding="utf-8") as fstream:
             self.content = yaml.safe_load(fstream)
-        
+
         if not isinstance(self.content, dict):
             raise Exception("LineFile is not a dictionary object.")
 
@@ -204,7 +205,7 @@ class LineFile:
             if new_string_workflow != resulting_string_workflow:
                 replacement_amount += 1
             resulting_string_workflow = new_string_workflow
-        
+
         return resulting_string_workflow, replacement_amount
 
     def _replace_static_variables(self, string_workflow):
@@ -216,7 +217,7 @@ class LineFile:
             if new_string_workflow != resulting_string_workflow:
                 replacement_amount += 1
             resulting_string_workflow = new_string_workflow
-        
+
         return resulting_string_workflow, replacement_amount
 
     def _replace_dynamic_variables(self, string_workflow, values: dict):
@@ -228,7 +229,7 @@ class LineFile:
             if new_string_workflow != resulting_string_workflow:
                 replacement_amount += 1
             resulting_string_workflow = new_string_workflow
-        
+
         return resulting_string_workflow, replacement_amount
 
     def _replace_all_variables(self, string_workflow, values: dict):
@@ -245,7 +246,7 @@ class LineFile:
         # Initially replace static variables.
         for variable in self.variables:
             new_string_workflow = string_workflow.replace(variable, str(self.variables.get(variable)))
-            
+
             if not self.ignore_non_replacements and new_string_workflow == string_workflow:
                 print("ERROR! HALT! ERROR! HALT! ERROR! HALT!")
                 print("HALT! ERROR! HALT! ERROR! HALT! ERROR!")
@@ -259,7 +260,7 @@ class LineFile:
                 print()
                 input("Press enter to exit program.")
                 exit(0)
-                
+
             string_workflow = new_string_workflow
 
         # Initially replace dynamic variables.
@@ -288,7 +289,7 @@ class LineFile:
         while replacement_cycles < 128 and last_replacement_count > 0:
             replacement_cycles += 1
             string_workflow, last_replacement_count = self._replace_all_variables(string_workflow, values)
-        
+
         if replacement_cycles > 127:
             print("ERROR! HALT! ERROR! HALT! ERROR! HALT!")
             print("HALT! ERROR! HALT! ERROR! HALT! ERROR!")
@@ -298,7 +299,7 @@ class LineFile:
             print("This indicates recursive replacement somewhere. Fix it manually.")
             print()
             input("Press enter to exit program.")
-            exit(0) 
+            exit(0)
 
         # Render workflow.
         # print(string_workflow)  # Debugging purposes

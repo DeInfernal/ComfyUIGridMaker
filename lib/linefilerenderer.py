@@ -46,11 +46,11 @@ class LineFileRenderer:
 
         # Build initial workflow state
         workflow_state = line_object.get_initial_workflow_state()
-        
+
         # Build queue of images and fill it with first image
         image_queue = list()
         image_queue.append(self._clone_workflowstate(workflow_state))
-        
+
         # Now go and make each slider slide.
         for slider in sliders_objects:
             current_varname = slider.get_variable_name()
@@ -119,7 +119,7 @@ class LineFileRenderer:
                     for image_path in reversed(list_of_images[1:-1]):
                         apng_image.append_file("{}/{}/{}".format("output", ofname, image_path), delay=delay_time)
                 apng_image.save("{}/{}.png".format("output", ofname))
-            
+
             if "webp" in kwargs.get("output_type"):
                 images = list()
                 durations = list()
@@ -127,7 +127,7 @@ class LineFileRenderer:
                 ofname = line_object.get_output_folder_name()
                 images_folder = "{}/{}".format("output", ofname)
                 list_of_images = os.listdir(images_folder)
-                
+
                 images.append(Image.open("{}/{}/{}".format("output", ofname, list_of_images[0])))
                 durations.append(4000)
 
@@ -152,7 +152,7 @@ class LineFileRenderer:
                 ofname = line_object.get_output_folder_name()
                 images_folder = "{}/{}".format("output", ofname)
                 list_of_images = os.listdir(images_folder)
-                
+
                 # Prepare averaged images first
                 averaged_images = []
                 averaging_radius = 1
@@ -187,7 +187,7 @@ class LineFileRenderer:
                 ofname = line_object.get_output_folder_name()
                 images_folder = "{}/{}".format("output", ofname)
                 list_of_images = os.listdir(images_folder)
-                
+
                 # Prepare averaged images first
                 averaged_images = []
                 averaging_radius = 2
@@ -222,14 +222,14 @@ class LineFileRenderer:
                 ofname = line_object.get_output_folder_name()
                 images_folder = "{}/{}".format("output", ofname)
                 list_of_images = os.listdir(images_folder)
-                
+
                 # Prepare averaged images first
                 averaged_images = []
                 averaging_radius = 3
                 for i in range(len(list_of_images)):
                     start = max(0, i - averaging_radius)
                     end = min(len(list_of_images), i + averaging_radius + 1)
-                    
+
                     images_to_combine = [np.asarray(Image.open("{}/{}/{}".format("output", ofname, list_of_images[j]))) for j in range(start, end)]
                     averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
                     averaged_images.append(Image.fromarray(averaged_image))
@@ -259,11 +259,11 @@ class LineFileRenderer:
                 outputfilename = "{}/{}.mp4".format("output", ofname)
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
-                
+
                 img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
                 for _ in range(4 * fps):
                     video_writer.write(img)
-                
+
                 for image_path in list_of_images[1:-1]:
                     img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
                     video_writer.write(img)
@@ -297,11 +297,11 @@ class LineFileRenderer:
                     images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
                     averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
                     averaged_images.append(averaged_image)
-                
+
                 img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
                 for _ in range(4 * fps):
                     video_writer.write(img)
-                
+
                 for image_file in averaged_images:
                     video_writer.write(image_file)
 
@@ -333,11 +333,11 @@ class LineFileRenderer:
                     images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
                     averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
                     averaged_images.append(averaged_image)
-                
+
                 img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
                 for _ in range(4 * fps):
                     video_writer.write(img)
-                
+
                 for image_file in averaged_images:
                     video_writer.write(image_file)
 
@@ -369,11 +369,11 @@ class LineFileRenderer:
                     images_to_combine = [cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[j])) for j in range(start, end)]
                     averaged_image = np.mean(images_to_combine, axis=0).astype(np.uint8)
                     averaged_images.append(averaged_image)
-                
+
                 img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
                 for _ in range(4 * fps):
                     video_writer.write(img)
-                
+
                 for image_file in averaged_images:
                     video_writer.write(image_file)
 
@@ -395,11 +395,11 @@ class LineFileRenderer:
                 outputfilename = "{}/{}.webm".format("output", ofname)
                 fourcc = cv2.VideoWriter_fourcc(*'vp80')
                 video_writer = cv2.VideoWriter(outputfilename, fourcc, fps, (line_object.get_image_width(), line_object.get_image_height()))
-                
+
                 img = cv2.imread("{}/{}/{}".format("output", ofname, list_of_images[0]))
                 for _ in range(4 * fps):
                     video_writer.write(img)
-                
+
                 for image_path in list_of_images[1:-1]:
                     img = cv2.imread("{}/{}/{}".format("output", ofname, image_path))
                     video_writer.write(img)

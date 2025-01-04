@@ -11,7 +11,8 @@ def parse_args():
     parser.add_argument("--comfyui_port", type=str, help="Port of ComfyUI interface", default="8188")
     parser.add_argument("--cleanup", action="store_true", help="Set the flag to delete images that is not the same name as the ones you want to generate.")
     parser.add_argument("--skip_mass_generation", action="store_true", help="Set the flag to skip the step with generation of XY plot (only make images)")
-    parser.add_argument("--make_html_table", action="store_true", help="Set the flag to make HTML version of the table too.")
+    parser.add_argument("--make_html_table", action="store_true", help="Set the flag to make HTML version of the table - The Original Infinitable.")
+    parser.add_argument("--make_html_smallplot", action="store_true", help="Set the flag to make HTML version of the table - The SmallPlot, web-friendly.")
     parser.add_argument("--ignore_non_replacements", action="store_true", help="Set the flag to True if you are fine that on Axis variable replacement step there can be no replacements to workflow")
     parser.add_argument("--yes", action="store_true", help="Do not wait for enter key in the end")
     parser.add_argument("--hash_filenames", action="store_true", help="Use sha256 hex-hashed filenames instead of usual filenames")
@@ -21,6 +22,7 @@ def parse_args():
     parser.add_argument("--autoreduce", type=int, help="Set the flag to automatically lower the XY grid size to a (your specified number) pixels if it was above such number.")
     parser.add_argument("plotfile", type=str, help="Path to PLOTFILE")
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -33,6 +35,7 @@ if __name__ == "__main__":
     kwargs.setdefault("flip_last_axis", args.flip_last_axis)
     kwargs.setdefault("autoflip_last_axis", args.autoflip_last_axis)
     kwargs.setdefault("make_html_table", args.make_html_table)
+    kwargs.setdefault("make_html_smallplot", args.make_html_smallplot)
     kwargs.setdefault("hash_filenames", args.hash_filenames)
     kwargs.setdefault("cleanup", args.cleanup)
     kwargs.setdefault("yes", args.yes)

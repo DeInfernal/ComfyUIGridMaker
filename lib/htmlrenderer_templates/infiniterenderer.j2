@@ -1,0 +1,195 @@
+<html>
+<head>
+    <title>Rendered plot of {{ RENDER_TITLE }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffc;
+            margin: 0;
+            padding: 20px;
+        }
+        img.plot_img {
+            max-width: {{ PREVIEW_IMAGE_WIDTH }}px;
+            max-height: {{ PREVIEW_IMAGE_HEIGHT }}px;
+            transition: transform 0.3s ease, z-index 0s linear 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+        img.plot_img:hover {
+            transform: scale(2);
+            z-index: 10;
+        }
+        td {
+            padding: 1px;
+            text-align: center;
+            position: relative;
+        }
+        table {
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        table.filtering {
+            border: 2px solid #999900;
+        }
+        td.filtering {
+            border: 1px solid #999900;
+            padding: 12px 8px 0px 8px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .overlay {
+            display: none;    /* Hidden by default */
+            position: fixed;  /* Stay in place */
+            top: 0;
+            left: 0;
+            width: 100%;  /* Full width of screen */
+            height: 100%; /* Full height of screen */
+            background-color: rgba(0, 0, 0, 0.8);  /* Black background with some opacity */
+            justify-content: center;  /* Center the contents */
+            align-items: center;      /* Center the contents */
+            z-index: 1000;  /* Sit on top of everything */
+        }
+        .overlay img {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-50%);
+            max-width: 90%;   /* Either full size of image or 90pct of screen, winch is higher */
+            max-height: 80%;  /* Either full size of image or 80pct of screen, winch is higher */
+        }
+        .overlay-text {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            padding: 10px;
+        }
+
+        tr.plot_depth_1, tr.plot_depth_2 {
+            background-color: #ff8000;
+            font-size: 12pt;
+        }
+        tr.plot_depth_3, tr.plot_depth_4 {
+            background-color: #ff9020;
+            font-size: 16pt;
+        }
+        tr.plot_depth_5, tr.plot_depth_6 {
+            background-color: #ffa040;
+            font-size: 20pt;
+        }
+        tr.plot_depth_7, tr.plot_depth_8 {
+            background-color: #ffb060;
+            font-size: 24pt;
+        }
+        tr.plot_depth_9, tr.plot_depth_10 {
+            background-color: #ffc080;
+            font-size: 28pt;
+        }
+    </style>
+</head>
+<body>
+    <div><h1>Rendered XY plot of {{ RENDER_TITLE }} folder</h1></div>
+
+    <div><i>Notice: If you have plots with more than 4000 images, you WILL need a beefy RAM.</i></div>
+
+    <div><h3>Image filter:</h3></div>
+
+    <div>
+        <table class="filtering">
+            <tr class="filtering">
+{% for single_axis in SORTING_OBJECT %}
+                <td class="filtering"><h4>{{ single_axis["axis_name"] }}</h4></td>
+{% endfor %}
+            </tr>
+            <tr class="filtering">
+{% for single_axis in SORTING_OBJECT %}
+                <td class="filtering">
+{% for single_value in single_axis["values"] %}
+                    <label><input type="checkbox" class="filter" data-filter-axis-id="{{ single_axis["axis_id"] }}" value="{{ single_value["value_id"] }}" checked>{{ single_value["value_name"] }}</label><br>
+{% endfor %}
+                </td>
+{% endfor %}
+            </tr>
+        </table>
+    </div>
+
+
+{{ PRERENDERED_IMAGE_TABLE }}
+
+<div class="overlay" id="overlay">
+    <img id="overlayImage" src="" alt="">
+    <div id="overlayText" class="overlay-text"></div>
+</div>
+
+<script>
+    // Function to handle image click and display overlay
+
+    const images = document.querySelectorAll('img');
+    const overlay = document.getElementById('overlay');
+    const overlayImage = document.getElementById('overlayImage');
+    const overlayText = document.getElementById('overlayText');
+
+    images.forEach(img => {
+        img.addEventListener('click', () => {
+            overlayImage.src = img.src;
+            overlayText.innerText = img.getAttribute('data-caption');
+            overlay.style.display = 'block';
+        });
+    });
+
+    // Close the overlay when clicking outside the image
+    overlay.addEventListener('click', () => {
+        overlay.style.display = 'none';
+    });
+    
+    function checkImageLoaded(imgobj, intervalId) {
+        const imageCheck = new Image();
+        imageCheck.src = imgobj.src + '?' + new Date().getTime();
+        imageCheck.onload = () => {
+            imgobj.src = imageCheck.src;
+            clearInterval(intervalId);
+        };
+    }
+    
+    const imageCells = document.querySelectorAll('td img');
+    imageCells.forEach((img) => {
+        // Create a new image object to check if it loads successfully
+        const imageCheck = new Image();
+        imageCheck.src = img.src;
+
+        imageCheck.onerror = () => {
+            const imgIntervalId = setInterval(() => {
+                checkImageLoaded(img, imgIntervalId);
+            }, {timeinterval});
+        };
+    });
+    
+    const checkboxes = document.querySelectorAll('.filter');
+    const filteredimages = document.querySelectorAll('img.plot_img');
+    function filterImages() {
+{% for single_axis in SORTING_OBJECT %}
+        const selected{{ single_axis["axis_id"] }} = Array.from(checkboxes).filter(checkbox => checkbox.checked && checkbox.dataset.filterAxisId === '{{ single_axis["axis_id"] }}').map(checkbox => checkbox.value); // Get array of values of checkboxes of {{ single_axis["axis_id"] }}th array.
+{% endfor %}
+
+        filteredimages.forEach(image => {
+{% for single_axis in SORTING_OBJECT %}
+            const imagechecked{{ single_axis["axis_id"] }} = image.getAttribute('data-axis-id-{{ single_axis["axis_id"] }}')
+{% endfor %}
+            if ({% for single_axis in SORTING_OBJECT %}selected{{ single_axis["axis_id"] }}.includes(imagechecked{{ single_axis["axis_id"] }}){% if not loop.last %} && {% endif %}{% endfor %}) {
+                image.classList.remove('hidden');
+            } else {
+                image.classList.add('hidden');
+            }
+        });
+    };
+
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', filterImages);
+    });
+</script>
+</body>
+</html>
